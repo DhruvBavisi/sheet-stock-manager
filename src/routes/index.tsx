@@ -42,7 +42,6 @@ import { DeleteEntryDialog } from "@/components/delete-entry-dialog";
 import {
   APPS_SCRIPT_CODE,
   appendRow,
-  convertKgToTons,
   formatDateDDMMMYYYY,
   loadConfig,
   loadLog,
@@ -205,13 +204,6 @@ function Index() {
     if (!quantity || Number.isNaN(rawQty) || rawQty <= 0) {
       toast.error("Enter a valid quantity");
       return;
-    }
-
-    // Convert >= 1000 kgs to Tons for backend and Google Sheets update
-    if (rawQty >= 1000 && (finalUnit === "kg" || finalUnit === "kgs")) {
-      const converted = convertKgToTons(rawQty, finalUnit);
-      finalQty = converted.quantity;
-      finalUnit = converted.unit;
     }
 
     // Format date as dd-mmm-yyyy (e.g. 12-Aug-2026)
