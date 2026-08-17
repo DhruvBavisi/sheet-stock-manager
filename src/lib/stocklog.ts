@@ -17,7 +17,7 @@ export type LogEntry = {
   synced: boolean;
 };
 
-const DEFAULT_PRODUCTS = ["Rice 5kg", "Sugar 1kg", "Cooking Oil 1L"];
+const DEFAULT_PRODUCTS: string[] = [];
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -34,7 +34,16 @@ function write(key: string, value: unknown) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
-export const loadProducts = () => read<string[]>(PRODUCTS_KEY, DEFAULT_PRODUCTS);
+const LEGACY_DEFAULTS = ["Rice 5kg", "Sugar 1kg", "Cooking Oil 1L"];
+
+export const loadProducts = () => {
+  const loaded = read<string[]>(PRODUCTS_KEY, DEFAULT_PRODUCTS);
+  const filtered = loaded.filter((p) => !LEGACY_DEFAULTS.includes(p));
+  if (filtered.length !== loaded.length) {
+    saveProducts(filtered);
+  }
+  return filtered;
+};
 export const saveProducts = (p: string[]) => write(PRODUCTS_KEY, p);
 
 export const loadConfig = (): AppConfig => {
