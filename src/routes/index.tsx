@@ -138,10 +138,14 @@ function Index() {
     setReady(true);
   }, []);
 
-  const configured = useMemo(
-    () => config.scriptUrl.trim().length > 0 && config.sheetId.trim().length > 0,
-    [config],
-  );
+  const configuredCount = useMemo(() => {
+    let count = 0;
+    if (config.scriptUrl.trim() && config.sheetId.trim()) count++;
+    if (config.scriptUrl2.trim() && config.sheetId2.trim()) count++;
+    return count;
+  }, [config]);
+
+  const configured = configuredCount > 0;
 
   const addMaterial = () => {
     const name = newMaterial.trim();
@@ -208,7 +212,7 @@ function Index() {
 
   const submit = async () => {
     if (!configured) {
-      toast.error("Set VITE_APPS_SCRIPT_URL and VITE_GOOGLE_SHEET_ID in your .env file first");
+      toast.error("Set Apps Script URL and Google Sheet ID in your .env file first");
       return;
     }
     if (!material) {
@@ -252,9 +256,18 @@ function Index() {
     };
 
     try {
-      await appendRow(config, payload);
+      const res = await appendRow(config, payload);
       entry.synced = true;
-      toast.success(`Appended ${material} entry to ${activeSheet} in Google Sheet (${formattedDate})`);
+      entry.syncedCount = res.syncedCount;
+
+      if (res.syncedCount > 1) {
+        toast.success(`Appended ${material} entry to ${activeSheet} in 2 Google Sheets (Email 1 & Email 2)!`);
+      } else {
+        toast.success(`Appended ${material} entry to ${activeSheet} in Google Sheet (${formattedDate})`);
+      }
+      if (res.errors && res.errors.length > 0) {
+        toast.warning(`Note: ${res.errors.join("; ")}`);
+      }
       clearForm();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not reach the Apps Script");
@@ -292,6 +305,16 @@ function Index() {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {configuredCount > 1 ? (
+                <Badge variant="secondary" className="hidden sm:inline-flex bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
+                  Dual Sheet Sync (2 Emails)
+                </Badge>
+              ) : configuredCount === 1 ? (
+                <Badge variant="secondary" className="hidden sm:inline-flex bg-blue-50 text-primary border-blue-200 text-xs font-semibold">
+                  Single Sheet Sync
+                </Badge>
+              ) : null}
+
               <Button
                 size="sm"
                 variant={installed ? "ghost" : "secondary"}
@@ -663,7 +686,7 @@ function Index() {
 
                   <div className="flex items-center gap-1.5">
                     <Badge variant={e.synced ? "secondary" : "destructive"} className={`text-[10px] rounded-md shrink-0 font-semibold ${e.synced ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : ""}`}>
-                      {e.synced ? "Synced" : "Failed"}
+                      {e.synced ? (e.syncedCount && e.syncedCount > 1 ? "Dual Synced" : "Synced") : "Failed"}
                     </Badge>
                     <button
                       onClick={() => openDeleteSingleDialog(e)}
@@ -712,23 +735,25 @@ function SettingsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-slate-900 font-bold">
             <ShieldCheck className="size-5 text-primary" />
-            Google Sheets connection
+            Google Sheets Dual Email Connection
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-500">
-            Your connection details are encrypted & loaded securely from your project <b>.env</b> file.
+            Link 2 separate Google Accounts / Emails to save data to both Google Sheets simultaneously.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <Separator />
 
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-primary font-medium">
-            <b>Apps Script Code:</b> Make sure your Google Apps Script is updated with this code to support <b>PUL-32</b>, <b>PUL-25</b>, and <b>Sieving</b> tabs.
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-primary font-medium space-y-1">
+            <p><b>Dual Email Instructions:</b></p>
+            <p>1. Deploy the Apps Script in <b>Google Account 1</b> & paste its URL/Sheet ID as <code>VITE_APPS_SCRIPT_URL</code> & <code>VITE_GOOGLE_SHEET_ID</code>.</p>
+            <p>2. Deploy the Apps Script in <b>Google Account 2</b> & paste its URL/Sheet ID as <code>VITE_APPS_SCRIPT_URL_2</code> & <code>VITE_GOOGLE_SHEET_ID_2</code>.</p>
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold text-slate-700">Apps Script Code</Label>
+              <Label className="text-xs font-semibold text-slate-700">Apps Script Backend Code</Label>
               <Button
                 size="sm"
                 variant="ghost"
@@ -750,3 +775,4 @@ function SettingsDialog({
     </Dialog>
   );
 }
+

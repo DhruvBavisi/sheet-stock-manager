@@ -24,8 +24,12 @@ const CONFIG_KEY = "stocklog.config";
 const LOG_KEY = "stocklog.log";
 
 export type AppConfig = {
+  // Account 1 / Email 1
   scriptUrl: string;
   sheetId: string;
+  // Account 2 / Email 2
+  scriptUrl2: string;
+  sheetId2: string;
   sheetName: string;
 };
 
@@ -44,6 +48,7 @@ export type LogEntry = {
   qty3No?: number | string;
   qty4No?: number | string;
   synced: boolean;
+  syncedCount?: number;
 };
 
 function read<T>(key: string, fallback: T): T {
@@ -63,7 +68,6 @@ function write(key: string, value: unknown) {
 
 export const loadMaterials = (): string[] => {
   const loaded = read<string[]>(MATERIALS_KEY, [...PREDEFINED_MATERIALS]);
-  // Ensure all predefined materials are present
   const merged = Array.from(new Set([...PREDEFINED_MATERIALS, ...loaded]));
   return merged;
 };
@@ -73,13 +77,23 @@ export const saveMaterials = (m: string[]) => write(MATERIALS_KEY, m);
 export const loadConfig = (): AppConfig => {
   const envUrl = (import.meta.env.VITE_APPS_SCRIPT_URL as string) || "";
   const envSheetId = (import.meta.env.VITE_GOOGLE_SHEET_ID as string) || "";
+  const envUrl2 = (import.meta.env.VITE_APPS_SCRIPT_URL_2 as string) || "";
+  const envSheetId2 = (import.meta.env.VITE_GOOGLE_SHEET_ID_2 as string) || "";
   const envSheetName = (import.meta.env.VITE_GOOGLE_SHEET_NAME as string) || "PUL-32";
 
-  const stored = read<AppConfig>(CONFIG_KEY, { scriptUrl: "", sheetId: "", sheetName: "PUL-32" });
+  const stored = read<AppConfig>(CONFIG_KEY, {
+    scriptUrl: "",
+    sheetId: "",
+    scriptUrl2: "",
+    sheetId2: "",
+    sheetName: "PUL-32",
+  });
 
   return {
     scriptUrl: envUrl.trim() || stored.scriptUrl.trim(),
     sheetId: envSheetId.trim() || stored.sheetId.trim(),
+    scriptUrl2: envUrl2.trim() || stored.scriptUrl2.trim(),
+    sheetId2: envSheetId2.trim() || stored.sheetId2.trim(),
     sheetName: envSheetName.trim() || stored.sheetName.trim() || "PUL-32",
   };
 };
@@ -95,9 +109,6 @@ export function todayISO() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/**
- * Formats a date string (YYYY-MM-DD or similar) into dd-mmm-yyyy (e.g. 18-Aug-2026).
- */
 export function formatDateDDMMMYYYY(dateStr: string): string {
   if (!dateStr) return "";
   const parts = dateStr.split("-");
@@ -124,14 +135,16 @@ export type AppendRowPayload = {
 };
 
 /**
- * Appends a row to the specified Google Sheet tab via the Apps Script web app.
+ * Sends a single POST payload to one Apps Script Web App URL.
  */
-export async function appendRow(config: AppConfig, payload: AppendRowPayload) {
-  const res = await fetch(config.scriptUrl, {
+async function sendToEndpoint(url: string, sheetId: string, payload: AppendRowPayload) {
+  if (!url || !sheetId) return { ok: false, error: "Missing URL or Sheet ID" };
+
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({
-      sheetId: config.sheetId,
+      sheetId: sheetId.trim(),
       sheetName: payload.sheetName,
       date: payload.date,
       material: payload.material,
@@ -145,15 +158,62 @@ export async function appendRow(config: AppConfig, payload: AppendRowPayload) {
     }),
     redirect: "follow",
   });
+
   const text = await res.text();
   let data: { ok?: boolean; error?: string } = {};
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error("Unexpected response from Apps Script. Check the deployment access setting.");
+    throw new Error("Unexpected response from Apps Script. Check deployment access setting.");
   }
   if (!res.ok || !data.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
+}
+
+/**
+ * Appends a row simultaneously to both Google Sheet Web App URLs (for 2 separate emails/accounts).
+ */
+export async function appendRow(config: AppConfig, payload: AppendRowPayload) {
+  const endpoints: { name: string; url: string; sheetId: string }[] = [];
+
+  if (config.scriptUrl.trim() && config.sheetId.trim()) {
+    endpoints.push({ name: "Account 1", url: config.scriptUrl.trim(), sheetId: config.sheetId.trim() });
+  }
+
+  if (config.scriptUrl2.trim() && config.sheetId2.trim()) {
+    endpoints.push({ name: "Account 2", url: config.scriptUrl2.trim(), sheetId: config.sheetId2.trim() });
+  }
+
+  if (endpoints.length === 0) {
+    throw new Error("No Google Sheet endpoints configured in .env");
+  }
+
+  const results = await Promise.allSettled(
+    endpoints.map((ep) => sendToEndpoint(ep.url, ep.sheetId, payload))
+  );
+
+  let successCount = 0;
+  const errors: string[] = [];
+
+  results.forEach((res, idx) => {
+    const epName = endpoints[idx].name;
+    if (res.status === "fulfilled") {
+      successCount++;
+    } else {
+      errors.push(`${epName}: ${res.reason?.message || "Failed"}`);
+    }
+  });
+
+  if (successCount === 0) {
+    throw new Error(`Failed to sync to any Google Sheet. ${errors.join("; ")}`);
+  }
+
+  return {
+    ok: true,
+    syncedCount: successCount,
+    totalEndpoints: endpoints.length,
+    errors,
+  };
 }
 
 export const APPS_SCRIPT_CODE = `function doPost(e) {
@@ -207,5 +267,6 @@ function doGet() {
     .createTextOutput(JSON.stringify({ ok: true, status: 'ready' }))
     .setMimeType(ContentService.MimeType.JSON);
 }`;
+
 
 
