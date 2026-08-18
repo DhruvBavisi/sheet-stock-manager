@@ -140,8 +140,8 @@ function Index() {
 
   const configuredCount = useMemo(() => {
     let count = 0;
-    if (config.scriptUrl.trim() && config.sheetId.trim()) count++;
-    if (config.scriptUrl2.trim() && config.sheetId2.trim()) count++;
+    if (config?.scriptUrl?.trim() && config?.sheetId?.trim()) count++;
+    if (config?.scriptUrl2?.trim() && config?.sheetId2?.trim()) count++;
     return count;
   }, [config]);
 

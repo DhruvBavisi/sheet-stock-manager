@@ -90,11 +90,11 @@ export const loadConfig = (): AppConfig => {
   });
 
   return {
-    scriptUrl: envUrl.trim() || stored.scriptUrl.trim(),
-    sheetId: envSheetId.trim() || stored.sheetId.trim(),
-    scriptUrl2: envUrl2.trim() || stored.scriptUrl2.trim(),
-    sheetId2: envSheetId2.trim() || stored.sheetId2.trim(),
-    sheetName: envSheetName.trim() || stored.sheetName.trim() || "PUL-32",
+    scriptUrl: (envUrl || stored?.scriptUrl || "").trim(),
+    sheetId: (envSheetId || stored?.sheetId || "").trim(),
+    scriptUrl2: (envUrl2 || stored?.scriptUrl2 || "").trim(),
+    sheetId2: (envSheetId2 || stored?.sheetId2 || "").trim(),
+    sheetName: (envSheetName || stored?.sheetName || "PUL-32").trim(),
   };
 };
 
@@ -176,17 +176,22 @@ async function sendToEndpoint(url: string, sheetId: string, payload: AppendRowPa
 export async function appendRow(config: AppConfig, payload: AppendRowPayload) {
   const endpoints: { name: string; url: string; sheetId: string }[] = [];
 
-  if (config.scriptUrl.trim() && config.sheetId.trim()) {
-    endpoints.push({ name: "Account 1", url: config.scriptUrl.trim(), sheetId: config.sheetId.trim() });
+  const url1 = config?.scriptUrl?.trim();
+  const id1 = config?.sheetId?.trim();
+  if (url1 && id1) {
+    endpoints.push({ name: "Account 1", url: url1, sheetId: id1 });
   }
 
-  if (config.scriptUrl2.trim() && config.sheetId2.trim()) {
-    endpoints.push({ name: "Account 2", url: config.scriptUrl2.trim(), sheetId: config.sheetId2.trim() });
+  const url2 = config?.scriptUrl2?.trim();
+  const id2 = config?.sheetId2?.trim();
+  if (url2 && id2) {
+    endpoints.push({ name: "Account 2", url: url2, sheetId: id2 });
   }
 
   if (endpoints.length === 0) {
     throw new Error("No Google Sheet endpoints configured in .env");
   }
+
 
   const results = await Promise.allSettled(
     endpoints.map((ep) => sendToEndpoint(ep.url, ep.sheetId, payload))
