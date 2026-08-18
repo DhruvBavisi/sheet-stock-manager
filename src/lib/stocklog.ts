@@ -134,6 +134,30 @@ export type AppendRowPayload = {
   qty4No?: number | string;
 };
 
+export type SyncEndpoint = {
+  name: string;
+  url: string;
+  sheetId: string;
+};
+
+export function getConfiguredEndpoints(config: AppConfig): SyncEndpoint[] {
+  const endpoints: SyncEndpoint[] = [];
+
+  const url1 = config?.scriptUrl?.trim();
+  const id1 = config?.sheetId?.trim();
+  if (url1 && id1) {
+    endpoints.push({ name: "Account 1", url: url1, sheetId: id1 });
+  }
+
+  const url2 = config?.scriptUrl2?.trim();
+  const id2 = config?.sheetId2?.trim();
+  if (url2 && id2) {
+    endpoints.push({ name: "Account 2", url: url2, sheetId: id2 });
+  }
+
+  return endpoints;
+}
+
 /**
  * Sends a single POST payload to one Apps Script Web App URL.
  */
@@ -164,60 +188,55 @@ async function sendToEndpoint(url: string, sheetId: string, payload: AppendRowPa
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error("Unexpected response from Apps Script. Check deployment access setting.");
+    const isHtml = text.trimStart().startsWith("<!DOCTYPE html") || text.includes("window['ppConfig']");
+    throw new Error(
+      isHtml
+        ? `Apps Script returned a Google login/consent page (${res.status}). Redeploy the web app as "Execute as: Me" and set "Who has access" to "Anyone" for anonymous server-side calls, or use a Sheets API/service-account flow for Workspace-only access.`
+        : `Unexpected response from Apps Script (${res.status}). Check deployment access setting and authorization.`,
+    );
   }
   if (!res.ok || !data.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
 
 /**
- * Appends a row simultaneously to both Google Sheet Web App URLs (for 2 separate emails/accounts).
+ * Appends a row via the same-origin API route so the browser does not call Google Sheets directly.
  */
 export async function appendRow(config: AppConfig, payload: AppendRowPayload) {
-  const endpoints: { name: string; url: string; sheetId: string }[] = [];
-
-  const url1 = config?.scriptUrl?.trim();
-  const id1 = config?.sheetId?.trim();
-  if (url1 && id1) {
-    endpoints.push({ name: "Account 1", url: url1, sheetId: id1 });
-  }
-
-  const url2 = config?.scriptUrl2?.trim();
-  const id2 = config?.sheetId2?.trim();
-  if (url2 && id2) {
-    endpoints.push({ name: "Account 2", url: url2, sheetId: id2 });
-  }
+  const endpoints = getConfiguredEndpoints(config);
 
   if (endpoints.length === 0) {
     throw new Error("No Google Sheet endpoints configured in .env");
   }
 
-
-  const results = await Promise.allSettled(
-    endpoints.map((ep) => sendToEndpoint(ep.url, ep.sheetId, payload))
-  );
-
-  let successCount = 0;
-  const errors: string[] = [];
-
-  results.forEach((res, idx) => {
-    const epName = endpoints[idx].name;
-    if (res.status === "fulfilled") {
-      successCount++;
-    } else {
-      errors.push(`${epName}: ${res.reason?.message || "Failed"}`);
-    }
+  const res = await fetch("/api/sheets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      endpoints,
+      payload,
+    }),
   });
 
-  if (successCount === 0) {
-    throw new Error(`Failed to sync to any Google Sheet. ${errors.join("; ")}`);
+  const text = await res.text();
+  let data: { ok?: boolean; syncedCount?: number; totalEndpoints?: number; errors?: string[]; error?: string } = {};
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    const snippet = text.slice(0, 180).replace(/\s+/g, " ");
+    throw new Error(`Unexpected response from sync API (${res.status}). ${snippet}`);
+  }
+
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || `Sync API failed (${res.status})`);
   }
 
   return {
     ok: true,
-    syncedCount: successCount,
-    totalEndpoints: endpoints.length,
-    errors,
+    syncedCount: data.syncedCount ?? endpoints.length,
+    totalEndpoints: data.totalEndpoints ?? endpoints.length,
+    errors: data.errors ?? [],
   };
 }
 
