@@ -27,9 +27,9 @@ export type AppConfig = {
   // Account 1 / Email 1
   scriptUrl: string;
   sheetId: string;
-  // Account 2 / Email 2
-  scriptUrl2: string;
-  sheetId2: string;
+  // Account 2 / Email 2 (Optional)
+  scriptUrl2?: string;
+  sheetId2?: string;
   sheetName: string;
 };
 

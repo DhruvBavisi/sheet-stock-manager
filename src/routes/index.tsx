@@ -80,7 +80,13 @@ export const Route = createFileRoute("/")({
 function Index() {
   const [activeSheet, setActiveSheet] = useState<SheetType>("PUL-32");
   const [materials, setMaterials] = useState<string[]>([...PREDEFINED_MATERIALS]);
-  const [config, setConfig] = useState<AppConfig>({ scriptUrl: "", sheetId: "", sheetName: "PUL-32" });
+  const [config, setConfig] = useState<AppConfig>({
+    scriptUrl: "",
+    sheetId: "",
+    scriptUrl2: "",
+    sheetId2: "",
+    sheetName: "PUL-32",
+  });
   const [log, setLog] = useState<LogEntry[]>([]);
   const [material, setMaterial] = useState("");
   const [date, setDate] = useState(todayISO());
@@ -305,16 +311,6 @@ function Index() {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {configuredCount > 1 ? (
-                <Badge variant="secondary" className="hidden sm:inline-flex bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
-                  Dual Sheet Sync (2 Emails)
-                </Badge>
-              ) : configuredCount === 1 ? (
-                <Badge variant="secondary" className="hidden sm:inline-flex bg-blue-50 text-primary border-blue-200 text-xs font-semibold">
-                  Single Sheet Sync
-                </Badge>
-              ) : null}
-
               <Button
                 size="sm"
                 variant={installed ? "ghost" : "secondary"}
