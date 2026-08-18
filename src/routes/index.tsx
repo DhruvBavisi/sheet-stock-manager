@@ -284,9 +284,6 @@ function Index() {
               <div className="min-w-0">
                 <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground flex items-center gap-2 truncate">
                   StockLog
-                  <span className="hidden sm:inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-primary border border-blue-200">
-                    White & Blue
-                  </span>
                 </h1>
                 <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
                   Google Sheet Stock Manager
