@@ -1,4 +1,25 @@
-const PRODUCTS_KEY = "stocklog.products";
+export type SheetType = "PUL-32" | "PUL-25" | "Sieving";
+
+export const SHEETS: { id: SheetType; label: string; description: string }[] = [
+  { id: "PUL-32", label: "PUL-32", description: "Columns: Date, Material, Qty-40, Qty-25, Qty-20" },
+  { id: "PUL-25", label: "PUL-25", description: "Columns: Date, Material, Qty-40, Qty-25, Qty-20" },
+  { id: "Sieving", label: "Sieving", description: "Columns: Date, Material, 1-No, 2-No, 3-No, 4-No" },
+];
+
+export const PREDEFINED_MATERIALS = [
+  "9T",
+  "5T",
+  "3T",
+  "20T",
+  "Chamak",
+  "UC4",
+  "Putha",
+  "CB-DN",
+  "CB-PW",
+  "Pen",
+] as const;
+
+const MATERIALS_KEY = "stocklog.materials";
 const CONFIG_KEY = "stocklog.config";
 const LOG_KEY = "stocklog.log";
 
@@ -10,14 +31,20 @@ export type AppConfig = {
 
 export type LogEntry = {
   id: string;
+  sheetName: SheetType;
   date: string;
-  product: string;
-  quantity: number;
-  unit: string;
+  material: string;
+  // Columns for PUL-32 & PUL-25
+  qty40?: number | string;
+  qty25?: number | string;
+  qty20?: number | string;
+  // Columns for Sieving
+  qty1No?: number | string;
+  qty2No?: number | string;
+  qty3No?: number | string;
+  qty4No?: number | string;
   synced: boolean;
 };
-
-const DEFAULT_PRODUCTS: string[] = [];
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -34,31 +61,29 @@ function write(key: string, value: unknown) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
-const LEGACY_DEFAULTS = ["Rice 5kg", "Sugar 1kg", "Cooking Oil 1L"];
-
-export const loadProducts = () => {
-  const loaded = read<string[]>(PRODUCTS_KEY, DEFAULT_PRODUCTS);
-  const filtered = loaded.filter((p) => !LEGACY_DEFAULTS.includes(p));
-  if (filtered.length !== loaded.length) {
-    saveProducts(filtered);
-  }
-  return filtered;
+export const loadMaterials = (): string[] => {
+  const loaded = read<string[]>(MATERIALS_KEY, [...PREDEFINED_MATERIALS]);
+  // Ensure all predefined materials are present
+  const merged = Array.from(new Set([...PREDEFINED_MATERIALS, ...loaded]));
+  return merged;
 };
-export const saveProducts = (p: string[]) => write(PRODUCTS_KEY, p);
+
+export const saveMaterials = (m: string[]) => write(MATERIALS_KEY, m);
 
 export const loadConfig = (): AppConfig => {
   const envUrl = (import.meta.env.VITE_APPS_SCRIPT_URL as string) || "";
   const envSheetId = (import.meta.env.VITE_GOOGLE_SHEET_ID as string) || "";
-  const envSheetName = (import.meta.env.VITE_GOOGLE_SHEET_NAME as string) || "Sheet1";
+  const envSheetName = (import.meta.env.VITE_GOOGLE_SHEET_NAME as string) || "PUL-32";
 
-  const stored = read<AppConfig>(CONFIG_KEY, { scriptUrl: "", sheetId: "", sheetName: "Sheet1" });
+  const stored = read<AppConfig>(CONFIG_KEY, { scriptUrl: "", sheetId: "", sheetName: "PUL-32" });
 
   return {
     scriptUrl: envUrl.trim() || stored.scriptUrl.trim(),
     sheetId: envSheetId.trim() || stored.sheetId.trim(),
-    sheetName: envSheetName.trim() || stored.sheetName.trim() || "Sheet1",
+    sheetName: envSheetName.trim() || stored.sheetName.trim() || "PUL-32",
   };
 };
+
 export const saveConfig = (c: AppConfig) => write(CONFIG_KEY, c);
 
 export const loadLog = () => read<LogEntry[]>(LOG_KEY, []);
@@ -71,7 +96,7 @@ export function todayISO() {
 }
 
 /**
- * Formats a date string (YYYY-MM-DD or similar) into dd-mmm-yyyy (e.g. 12-Aug-2026).
+ * Formats a date string (YYYY-MM-DD or similar) into dd-mmm-yyyy (e.g. 18-Aug-2026).
  */
 export function formatDateDDMMMYYYY(dateStr: string): string {
   if (!dateStr) return "";
@@ -85,42 +110,38 @@ export function formatDateDDMMMYYYY(dateStr: string): string {
   return `${day}-${monthName}-${year}`;
 }
 
-/**
- * Converts kg to Tons if quantity is 1000 or above.
- */
-export function convertKgToTons(qty: number, currentUnit: string): { quantity: number; unit: string; converted: boolean; originalQty?: number } {
-  const lowerUnit = currentUnit.toLowerCase().trim();
-  if ((lowerUnit === "kg" || lowerUnit === "kgs" || lowerUnit === "kilograms" || lowerUnit === "") && qty >= 1000) {
-    const tons = Math.round((qty / 1000) * 1000) / 1000;
-    return {
-      quantity: tons,
-      unit: tons === 1 ? "Ton" : "Tons",
-      converted: true,
-      originalQty: qty,
-    };
-  }
-  return { quantity: qty, unit: currentUnit || "kg", converted: false };
-}
+export type AppendRowPayload = {
+  sheetName: SheetType;
+  date: string;
+  material: string;
+  qty40?: number | string;
+  qty25?: number | string;
+  qty20?: number | string;
+  qty1No?: number | string;
+  qty2No?: number | string;
+  qty3No?: number | string;
+  qty4No?: number | string;
+};
 
 /**
- * Appends a row to the Google Sheet via the Apps Script web app.
- * text/plain keeps it a "simple" request so the browser skips the CORS preflight.
+ * Appends a row to the specified Google Sheet tab via the Apps Script web app.
  */
-export async function appendRow(
-  config: AppConfig,
-  payload: { date: string; product: string; quantity: number; unit: string },
-) {
-  const formattedQuantity = `${payload.quantity} ${payload.unit}`.trim();
+export async function appendRow(config: AppConfig, payload: AppendRowPayload) {
   const res = await fetch(config.scriptUrl, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({
       sheetId: config.sheetId,
-      sheetName: config.sheetName || "Sheet1",
+      sheetName: payload.sheetName,
       date: payload.date,
-      product: payload.product,
-      quantity: formattedQuantity,
-      formattedQuantity,
+      material: payload.material,
+      qty40: payload.qty40 ?? "",
+      qty25: payload.qty25 ?? "",
+      qty20: payload.qty20 ?? "",
+      qty1No: payload.qty1No ?? "",
+      qty2No: payload.qty2No ?? "",
+      qty3No: payload.qty3No ?? "",
+      qty4No: payload.qty4No ?? "",
     }),
     redirect: "follow",
   });
@@ -139,15 +160,37 @@ export const APPS_SCRIPT_CODE = `function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.openById(body.sheetId);
-    var sheet = ss.getSheetByName(body.sheetName || 'Sheet1') || ss.insertSheet(body.sheetName || 'Sheet1');
+    var sheetName = body.sheetName || 'PUL-32';
+    var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
 
+    // Auto-create header row if sheet is empty
     if (sheet.getLastRow() === 0) {
-      sheet.appendRow(['Date', 'Product', 'Quantity']);
+      if (sheetName === 'Sieving') {
+        sheet.appendRow(['Date', 'Material', '1-No', '2-No', '3-No', '4-No']);
+      } else {
+        sheet.appendRow(['Date', 'Material', 'Qty-40', 'Qty-25', 'Qty-20']);
+      }
     }
 
-    var qtyDisplay = body.formattedQuantity || body.quantity;
-
-    sheet.appendRow([body.date, body.product, String(qtyDisplay)]);
+    // Append row based on sheet type
+    if (sheetName === 'Sieving') {
+      sheet.appendRow([
+        body.date || '',
+        body.material || '',
+        body.qty1No !== undefined && body.qty1No !== '' ? Number(body.qty1No) : '',
+        body.qty2No !== undefined && body.qty2No !== '' ? Number(body.qty2No) : '',
+        body.qty3No !== undefined && body.qty3No !== '' ? Number(body.qty3No) : '',
+        body.qty4No !== undefined && body.qty4No !== '' ? Number(body.qty4No) : ''
+      ]);
+    } else {
+      sheet.appendRow([
+        body.date || '',
+        body.material || '',
+        body.qty40 !== undefined && body.qty40 !== '' ? Number(body.qty40) : '',
+        body.qty25 !== undefined && body.qty25 !== '' ? Number(body.qty25) : '',
+        body.qty20 !== undefined && body.qty20 !== '' ? Number(body.qty20) : ''
+      ]);
+    }
 
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true }))
@@ -164,4 +207,5 @@ function doGet() {
     .createTextOutput(JSON.stringify({ ok: true, status: 'ready' }))
     .setMimeType(ContentService.MimeType.JSON);
 }`;
+
 

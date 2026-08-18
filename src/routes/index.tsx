@@ -9,12 +9,10 @@ import {
   Settings,
   Trash2,
   Copy,
-  CheckCircle2,
-  Scale,
-  Sparkles,
-  RefreshCw,
   ShieldCheck,
   Lock,
+  Layers,
+  FileSpreadsheet,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -41,32 +39,35 @@ import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { DeleteEntryDialog } from "@/components/delete-entry-dialog";
 import {
   APPS_SCRIPT_CODE,
+  SHEETS,
+  PREDEFINED_MATERIALS,
   appendRow,
   formatDateDDMMMYYYY,
   loadConfig,
   loadLog,
-  loadProducts,
+  loadMaterials,
   saveConfig,
   saveLog,
-  saveProducts,
+  saveMaterials,
   todayISO,
   type AppConfig,
   type LogEntry,
+  type SheetType,
 } from "@/lib/stocklog";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "StockLog - Log Products to Google Sheets" },
+      { title: "StockLog - Multi-Sheet Stock Manager" },
       {
         name: "description",
         content:
-          "Installable app to record date, product and quantity, appended as rows to your Google Sheet via Apps Script.",
+          "Record Date, Material, and sheet-specific quantities directly to PUL-32, PUL-25, or Sieving tabs in your Google Sheets.",
       },
-      { property: "og:title", content: "StockLog - Log Products to Google Sheets" },
+      { property: "og:title", content: "StockLog - Multi-Sheet Stock Manager" },
       {
         property: "og:description",
-        content: "Pick a product, enter quantity, and append the row to your Google Sheet instantly.",
+        content: "Log PUL-32, PUL-25, and Sieving stock entries directly to Google Sheets.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -76,16 +77,28 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const [products, setProducts] = useState<string[]>([]);
-  const [config, setConfig] = useState<AppConfig>({ scriptUrl: "", sheetId: "", sheetName: "Sheet1" });
+  const [activeSheet, setActiveSheet] = useState<SheetType>("PUL-32");
+  const [materials, setMaterials] = useState<string[]>([...PREDEFINED_MATERIALS]);
+  const [config, setConfig] = useState<AppConfig>({ scriptUrl: "", sheetId: "", sheetName: "PUL-32" });
   const [log, setLog] = useState<LogEntry[]>([]);
-  const [product, setProduct] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [unit, setUnit] = useState("kg");
+  const [material, setMaterial] = useState("");
   const [date, setDate] = useState(todayISO());
-  const [newProduct, setNewProduct] = useState("");
+
+  // Fields for PUL-32 and PUL-25
+  const [qty40, setQty40] = useState("");
+  const [qty25, setQty25] = useState("");
+  const [qty20, setQty20] = useState("");
+
+  // Fields for Sieving
+  const [qty1No, setQty1No] = useState("");
+  const [qty2No, setQty2No] = useState("");
+  const [qty3No, setQty3No] = useState("");
+  const [qty4No, setQty4No] = useState("");
+
+  const [newMaterial, setNewMaterial] = useState("");
   const [saving, setSaving] = useState(false);
   const [ready, setReady] = useState(false);
+  const [logFilter, setLogFilter] = useState<"ALL" | SheetType>("ALL");
 
   // Dialog states
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -99,7 +112,6 @@ function Index() {
     const downloadFileName = isMobile ? "StockLog-Android.apk" : "StockLog-Desktop.zip";
     const downloadPath = `/downloads/${downloadFileName}`;
 
-    // 1. Direct Original App Installer Download
     const link = document.createElement("a");
     link.href = downloadPath;
     link.download = downloadFileName;
@@ -107,20 +119,19 @@ function Index() {
     link.click();
     document.body.removeChild(link);
 
-    // 2. Also trigger native browser PWA install prompt if supported
     if (canInstall) {
       promptInstall().catch(() => {});
     }
 
     toast.success(
       isMobile
-        ? "Downloading StockLog original Android App (.apk)..."
+        ? "Downloading StockLog Android App (.apk)..."
         : "Downloading StockLog Desktop Application Package (.zip)...",
     );
   };
 
   useEffect(() => {
-    setProducts(loadProducts());
+    setMaterials(loadMaterials());
     setConfig(loadConfig());
     setLog(loadLog());
     setReady(true);
@@ -131,34 +142,30 @@ function Index() {
     [config],
   );
 
-  const handleQuantityInput = (val: string) => {
-    setQuantity(val);
-  };
-
-  const handleUnitSelect = (selectedUnit: string) => {
-    setUnit(selectedUnit);
-  };
-
-  const addProduct = () => {
-    const name = newProduct.trim();
+  const addMaterial = () => {
+    const name = newMaterial.trim();
     if (!name) return;
-    if (products.some((p) => p.toLowerCase() === name.toLowerCase())) {
-      toast.error("That product is already in the list");
+    if (materials.some((m) => m.toLowerCase() === name.toLowerCase())) {
+      toast.error("That material is already in the list");
       return;
     }
-    const next = [...products, name].sort((a, b) => a.localeCompare(b));
-    setProducts(next);
-    saveProducts(next);
-    setProduct(name);
-    setNewProduct("");
+    const next = [...materials, name];
+    setMaterials(next);
+    saveMaterials(next);
+    setMaterial(name);
+    setNewMaterial("");
     toast.success(`Added "${name}"`);
   };
 
-  const removeProduct = (name: string) => {
-    const next = products.filter((p) => p !== name);
-    setProducts(next);
-    saveProducts(next);
-    if (product === name) setProduct("");
+  const removeMaterial = (name: string) => {
+    if (PREDEFINED_MATERIALS.includes(name as any)) {
+      toast.error("Predefined materials cannot be removed");
+      return;
+    }
+    const next = materials.filter((m) => m !== name);
+    setMaterials(next);
+    saveMaterials(next);
+    if (material === name) setMaterial("");
   };
 
   const openDeleteSingleDialog = (e: LogEntry) => {
@@ -182,10 +189,20 @@ function Index() {
       const next = log.filter((item) => item.id !== entryToDelete.id);
       setLog(next);
       saveLog(next);
-      toast.success(`Deleted entry for "${entryToDelete.product}"`);
+      toast.success(`Deleted entry for "${entryToDelete.material}"`);
     }
     setDeleteDialogOpen(false);
     setEntryToDelete(null);
+  };
+
+  const clearForm = () => {
+    setQty40("");
+    setQty25("");
+    setQty20("");
+    setQty1No("");
+    setQty2No("");
+    setQty3No("");
+    setQty4No("");
   };
 
   const submit = async () => {
@@ -193,37 +210,51 @@ function Index() {
       toast.error("Set VITE_APPS_SCRIPT_URL and VITE_GOOGLE_SHEET_ID in your .env file first");
       return;
     }
-    let rawQty = Number(quantity);
-    let finalQty = rawQty;
-    let finalUnit = unit;
-
-    if (!product) {
-      toast.error("Select a product");
-      return;
-    }
-    if (!quantity || Number.isNaN(rawQty) || rawQty <= 0) {
-      toast.error("Enter a valid quantity");
+    if (!material) {
+      toast.error("Select a material");
       return;
     }
 
-    // Format date as dd-mmm-yyyy (e.g. 12-Aug-2026)
+    if (activeSheet === "Sieving") {
+      if (!qty1No && !qty2No && !qty3No && !qty4No) {
+        toast.error("Enter at least one quantity value (1-No, 2-No, 3-No, or 4-No)");
+        return;
+      }
+    } else {
+      if (!qty40 && !qty25 && !qty20) {
+        toast.error("Enter at least one quantity value (Qty-40, Qty-25, or Qty-20)");
+        return;
+      }
+    }
+
     const formattedDate = formatDateDDMMMYYYY(date);
-
     setSaving(true);
+
+    const payload = {
+      sheetName: activeSheet,
+      date: formattedDate,
+      material,
+      ...(activeSheet === "Sieving"
+        ? { qty1No, qty2No, qty3No, qty4No }
+        : { qty40, qty25, qty20 }),
+    };
+
     const entry: LogEntry = {
       id: crypto.randomUUID(),
+      sheetName: activeSheet,
       date: formattedDate,
-      product,
-      quantity: finalQty,
-      unit: finalUnit,
+      material,
+      ...(activeSheet === "Sieving"
+        ? { qty1No, qty2No, qty3No, qty4No }
+        : { qty40, qty25, qty20 }),
       synced: false,
     };
 
     try {
-      await appendRow(config, { date: formattedDate, product, quantity: finalQty, unit: finalUnit });
+      await appendRow(config, payload);
       entry.synced = true;
-      toast.success(`Appended ${finalQty} ${finalUnit} to Google Sheet (${formattedDate})`);
-      setQuantity("");
+      toast.success(`Appended ${material} entry to ${activeSheet} in Google Sheet (${formattedDate})`);
+      clearForm();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not reach the Apps Script");
     } finally {
@@ -234,16 +265,23 @@ function Index() {
     }
   };
 
+  const filteredLog = useMemo(() => {
+    if (logFilter === "ALL") return log;
+    return log.filter((e) => e.sheetName === logFilter);
+  }, [log, logFilter]);
+
   return (
     <main className="min-h-screen bg-background pb-16">
-      <header className="border-b border-border/60 bg-card/95 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-5 py-4">
+      <header className="border-b border-border/60 bg-card/95 backdrop-blur sticky top-0 z-10 shadow-xs">
+        <div className="mx-auto flex max-w-3xl items-center gap-3 px-5 py-4">
           <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
             <ClipboardList className="size-5" />
           </span>
           <div className="flex-1">
-            <h1 className="text-lg font-bold tracking-tight">StockLog</h1>
-            <p className="text-xs text-muted-foreground">Entries append straight to your Google Sheet</p>
+            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
+              StockLog <Badge variant="outline" className="text-xs font-mono font-medium">Multi-Sheet</Badge>
+            </h1>
+            <p className="text-xs text-muted-foreground">Entries append to PUL-32, PUL-25, or Sieving sheets</p>
           </div>
 
           <Button
@@ -261,174 +299,339 @@ function Index() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl space-y-6 px-5 py-6">
+      <div className="mx-auto max-w-3xl space-y-6 px-5 py-6">
         {ready && !configured && (
           <div className="rounded-xl border border-dashed border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive font-medium flex items-center gap-2">
             <Lock className="size-4 shrink-0" />
-            <span>Please add <b>VITE_APPS_SCRIPT_URL</b> and <b>VITE_GOOGLE_SHEET_ID</b> to your <code>.env</code> file to enable Google Sheets sync.</span>
+            <span>Please set <b>VITE_APPS_SCRIPT_URL</b> and <b>VITE_GOOGLE_SHEET_ID</b> in your <code>.env</code> file to enable Google Sheets sync.</span>
           </div>
         )}
 
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-4">
+        {/* Tab Selection */}
+        <section className="rounded-2xl border border-border bg-card p-4 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-              <Plus className="size-4 text-primary" /> New entry
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Layers className="size-4 text-primary" /> Select Target Sheet
             </h2>
-            <span className="text-xs text-muted-foreground font-mono">{date}</span>
+            <Badge variant="secondary" className="font-mono text-xs">
+              Active: {activeSheet}
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {SHEETS.map((s) => {
+              const isActive = activeSheet === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    setActiveSheet(s.id);
+                    clearForm();
+                  }}
+                  className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all ${
+                    isActive
+                      ? "border-primary bg-primary/10 text-primary font-bold shadow-xs ring-1 ring-primary/30"
+                      : "border-border bg-muted/30 text-muted-foreground hover:bg-muted/60 font-medium"
+                  }`}
+                >
+                  <FileSpreadsheet className={`size-5 mb-1 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                  <span className="text-sm font-semibold">{s.label}</span>
+                  {/* <span className="text-[10px] opacity-75 hidden sm:inline">{s.id === "Sieving" ? "4 Columns" : "3 Columns"}</span> */}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* New Entry Form */}
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-border/60 pb-3">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-foreground flex items-center gap-2">
+              New Entry for <span className="text-primary font-black">{activeSheet}</span>
+            </h2>
+            <span className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded-md">{date}</span>
           </div>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Product</Label>
-              <Select value={product} onValueChange={setProduct}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="qty">Quantity</Label>
-                <span className="text-[11px] text-muted-foreground">
-                  ≥ 1000 kg auto-converts to Tons
-                </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="date" className="text-xs font-semibold">Date</Label>
+                <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-xl" />
               </div>
-              <div className="flex gap-2">
-                <Input
-                  id="qty"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="any"
-                  placeholder="0"
-                  className="flex-1"
-                  value={quantity}
-                  onChange={(e) => handleQuantityInput(e.target.value)}
-                />
-                <Select value={unit} onValueChange={handleUnitSelect}>
-                  <SelectTrigger className="w-28 font-medium">
-                    <SelectValue placeholder="Unit" />
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold">Material</Label>
+                <Select value={material} onValueChange={setMaterial}>
+                  <SelectTrigger className="w-full rounded-xl font-medium">
+                    <SelectValue placeholder="Select a material" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="kg">Kg</SelectItem>
-                    <SelectItem value="Ton">Ton / Tons</SelectItem>
-                    <SelectItem value="Pcs">Pcs</SelectItem>
-                    <SelectItem value="Bag">Bag</SelectItem>
-                    <SelectItem value="Box">Box</SelectItem>
-                    <SelectItem value="L">Liters (L)</SelectItem>
+                  <SelectContent className="rounded-xl">
+                    {materials.map((m) => (
+                      <SelectItem key={m} value={m} className="font-medium">
+                        {m}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
+            {/* Dynamic Column Inputs */}
+            {activeSheet === "Sieving" ? (
+              <div className="space-y-2 rounded-xl border border-border/80 bg-muted/20 p-4">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+                  Sieving Quantities (1-No, 2-No, 3-No, 4-No)
+                </Label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="qty1No" className="text-xs text-muted-foreground font-medium">1-No</Label>
+                    <Input
+                      id="qty1No"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={qty1No}
+                      onChange={(e) => setQty1No(e.target.value)}
+                      className="rounded-xl font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="qty2No" className="text-xs text-muted-foreground font-medium">2-No</Label>
+                    <Input
+                      id="qty2No"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={qty2No}
+                      onChange={(e) => setQty2No(e.target.value)}
+                      className="rounded-xl font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="qty3No" className="text-xs text-muted-foreground font-medium">3-No</Label>
+                    <Input
+                      id="qty3No"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={qty3No}
+                      onChange={(e) => setQty3No(e.target.value)}
+                      className="rounded-xl font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="qty4No" className="text-xs text-muted-foreground font-medium">4-No</Label>
+                    <Input
+                      id="qty4No"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={qty4No}
+                      onChange={(e) => setQty4No(e.target.value)}
+                      className="rounded-xl font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 rounded-xl border border-border/80 bg-muted/20 p-4">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+                  {activeSheet} Quantities (Qty-40, Qty-25, Qty-20)
+                </Label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="qty40" className="text-xs text-muted-foreground font-medium">Qty-40</Label>
+                    <Input
+                      id="qty40"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={qty40}
+                      onChange={(e) => setQty40(e.target.value)}
+                      className="rounded-xl font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="qty25" className="text-xs text-muted-foreground font-medium">Qty-25</Label>
+                    <Input
+                      id="qty25"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={qty25}
+                      onChange={(e) => setQty25(e.target.value)}
+                      className="rounded-xl font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="qty20" className="text-xs text-muted-foreground font-medium">Qty-20</Label>
+                    <Input
+                      id="qty20"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={qty20}
+                      onChange={(e) => setQty20(e.target.value)}
+                      className="rounded-xl font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <Button className="h-12 w-full text-base font-semibold rounded-xl" onClick={submit} disabled={saving}>
               {saving ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-              {saving ? "Saving to Sheet..." : "Add to Google Sheet"}
+              {saving ? `Saving to ${activeSheet}...` : `Append Row to ${activeSheet}`}
             </Button>
           </div>
         </section>
 
+        {/* Predefined Materials List & Manager */}
         <section className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Product list
-          </h2>
-          <div className="mt-4 flex gap-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Materials List
+            </h2>
+            <span className="text-xs text-muted-foreground">{materials.length} available</span>
+          </div>
+
+          <div className="mt-3 flex gap-2">
             <Input
-              placeholder="New product name"
-              value={newProduct}
-              onChange={(e) => setNewProduct(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addProduct()}
+              placeholder="Add custom material name"
+              value={newMaterial}
+              onChange={(e) => setNewMaterial(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addMaterial()}
+              className="rounded-xl"
             />
-            <Button variant="secondary" onClick={addProduct} className="rounded-xl font-medium">
+            <Button variant="secondary" onClick={addMaterial} className="rounded-xl font-medium shrink-0">
               <Plus className="size-4" /> Add
             </Button>
           </div>
+
           <div className="mt-4 flex flex-wrap gap-2">
-            {products.length === 0 && (
-              <p className="text-sm text-muted-foreground">No products yet — add your first one.</p>
-            )}
-            {products.map((p) => (
-              <span
-                key={p}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 py-1 pl-3 pr-1.5 text-sm"
-              >
-                {p}
-                <button
-                  aria-label={`Remove ${p}`}
-                  onClick={() => removeProduct(p)}
-                  className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            {materials.map((m) => {
+              const isPredefined = PREDEFINED_MATERIALS.includes(m as any);
+              return (
+                <span
+                  key={m}
+                  className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-3 pr-2 text-xs font-medium ${
+                    isPredefined
+                      ? "border-primary/30 bg-primary/5 text-primary"
+                      : "border-border bg-muted/50 text-foreground"
+                  }`}
                 >
-                  <Trash2 className="size-3.5" />
-                </button>
-              </span>
-            ))}
+                  {m}
+                  {!isPredefined && (
+                    <button
+                      aria-label={`Remove ${m}`}
+                      onClick={() => removeMaterial(m)}
+                      className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  )}
+                </span>
+              );
+            })}
           </div>
         </section>
 
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Recent entries
-            </h2>
-            {log.length > 0 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive gap-1.5"
-                onClick={openClearAllDialog}
-              >
-                <Trash2 className="size-3.5" /> Clear all
-              </Button>
-            )}
+        {/* Recent Log Entries */}
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-foreground">
+                Recent Log History
+              </h2>
+              <Badge variant="secondary" className="text-xs font-mono">
+                {filteredLog.length} {filteredLog.length === 1 ? "entry" : "entries"}
+              </Badge>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Select value={logFilter} onValueChange={(val) => setLogFilter(val as any)}>
+                <SelectTrigger className="w-32 h-8 text-xs rounded-lg font-medium">
+                  <SelectValue placeholder="Filter Sheet" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl text-xs">
+                  <SelectItem value="ALL">All Sheets</SelectItem>
+                  <SelectItem value="PUL-32">PUL-32</SelectItem>
+                  <SelectItem value="PUL-25">PUL-25</SelectItem>
+                  <SelectItem value="Sieving">Sieving</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {log.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive gap-1 rounded-lg"
+                  onClick={openClearAllDialog}
+                >
+                  <Trash2 className="size-3.5" /> Clear
+                </Button>
+              )}
+            </div>
           </div>
 
-          <ul className="divide-y divide-border/60">
-            {log.length === 0 && (
-              <li className="py-4 text-center text-sm text-muted-foreground">Nothing logged yet.</li>
+          <div className="space-y-3">
+            {filteredLog.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No entries found for {logFilter === "ALL" ? "any sheet" : logFilter}.
+              </p>
             )}
-            {log.slice(0, 15).map((e) => (
-              <li key={e.id} className="flex items-center gap-3 py-3 text-sm">
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold truncate text-foreground">{e.product}</p>
-                  <p className="text-xs text-muted-foreground">{e.date}</p>
+            {filteredLog.slice(0, 20).map((e) => (
+              <div
+                key={e.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border bg-muted/20 text-sm"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Badge variant="outline" className="font-mono text-xs font-bold shrink-0">
+                    {e.sheetName}
+                  </Badge>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground truncate">{e.material}</p>
+                    <p className="text-xs text-muted-foreground">{e.date}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="tabular-nums font-bold text-foreground">
-                    {e.quantity} <span className="text-xs font-normal text-muted-foreground">{e.unit || "kg"}</span>
-                  </span>
+
+                <div className="flex items-center gap-3 justify-between sm:justify-end">
+                  <div className="text-xs font-mono bg-background border border-border/80 px-2.5 py-1 rounded-lg">
+                    {e.sheetName === "Sieving" ? (
+                      <div className="flex gap-2 text-foreground">
+                        {e.qty1No != null && e.qty1No !== "" && <span>1-No: <b>{e.qty1No}</b></span>}
+                        {e.qty2No != null && e.qty2No !== "" && <span>2-No: <b>{e.qty2No}</b></span>}
+                        {e.qty3No != null && e.qty3No !== "" && <span>3-No: <b>{e.qty3No}</b></span>}
+                        {e.qty4No != null && e.qty4No !== "" && <span>4-No: <b>{e.qty4No}</b></span>}
+                      </div>
+                    ) : (
+                      <div className="flex gap-2 text-foreground">
+                        {e.qty40 != null && e.qty40 !== "" && <span>Q40: <b>{e.qty40}</b></span>}
+                        {e.qty25 != null && e.qty25 !== "" && <span>Q25: <b>{e.qty25}</b></span>}
+                        {e.qty20 != null && e.qty20 !== "" && <span>Q20: <b>{e.qty20}</b></span>}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Badge variant={e.synced ? "secondary" : "destructive"} className="text-[10px] rounded-lg shrink-0">
+                      {e.synced ? "Synced" : "Failed"}
+                    </Badge>
+                    <button
+                      onClick={() => openDeleteSingleDialog(e)}
+                      title="Delete this entry"
+                      className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
                 </div>
-                <Badge variant={e.synced ? "secondary" : "destructive"} className="text-[11px] rounded-lg">
-                  {e.synced ? "Synced" : "Failed"}
-                </Badge>
-                <button
-                  onClick={() => openDeleteSingleDialog(e)}
-                  title="Delete this recent entry"
-                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         </section>
       </div>
 
-
-
-      {/* Customized Delete Confirmation Dialog */}
       <DeleteEntryDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
@@ -449,7 +652,6 @@ function SettingsDialog({
   onSave: (c: AppConfig) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const isConfigured = Boolean(config.scriptUrl && config.sheetId);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -472,9 +674,13 @@ function SettingsDialog({
         <div className="space-y-4">
           <Separator />
 
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200 font-medium">
+            <b>Important Update Notice:</b> Please update your Google Apps Script code with the new code below to support <b>PUL-32</b>, <b>PUL-25</b>, and <b>Sieving</b> sheets and their specific column structures.
+          </div>
+
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold">Apps Script backend code</Label>
+              <Label className="text-xs font-semibold">Updated Apps Script backend code</Label>
               <Button
                 size="sm"
                 variant="ghost"
@@ -491,13 +697,12 @@ function SettingsDialog({
               <code>{APPS_SCRIPT_CODE}</code>
             </pre>
             <ol className="list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
-              <li>Open <b>script.google.com</b> and create a new project.</li>
-              <li>Paste the code above and click save.</li>
+              <li>Open <b>script.google.com</b> and select your project.</li>
+              <li>Paste the updated code above into <code>Code.gs</code> and click save.</li>
               <li>
-                Deploy → New deployment → Web app → Execute as <b>Me</b>, access{" "}
-                <b>Anyone</b>.
+                Click <b>Deploy → New deployment</b> (or Manage deployments → Edit → New version) → Web app → Execute as <b>Me</b>, access <b>Anyone</b>.
               </li>
-              <li>Paste the Web App URL into your <code>.env</code> file as <code>VITE_APPS_SCRIPT_URL</code>.</li>
+              <li>Ensure your Web App URL is set in your <code>.env</code> file as <code>VITE_APPS_SCRIPT_URL</code>.</li>
             </ol>
           </div>
         </div>
@@ -505,4 +710,5 @@ function SettingsDialog({
     </Dialog>
   );
 }
+
 

@@ -1,4 +1,4 @@
-import { Trash2, AlertTriangle, PackageCheck } from "lucide-react";
+import { Trash2, AlertTriangle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +28,22 @@ export function DeleteEntryDialog({
   totalEntriesCount = 0,
   onConfirmDelete,
 }: DeleteEntryDialogProps) {
-  const displayUnit = entry?.unit || "kg";
+  const getQtySummary = (item: LogEntry) => {
+    if (item.sheetName === "Sieving") {
+      const parts = [];
+      if (item.qty1No != null && item.qty1No !== "") parts.push(`1-No: ${item.qty1No}`);
+      if (item.qty2No != null && item.qty2No !== "") parts.push(`2-No: ${item.qty2No}`);
+      if (item.qty3No != null && item.qty3No !== "") parts.push(`3-No: ${item.qty3No}`);
+      if (item.qty4No != null && item.qty4No !== "") parts.push(`4-No: ${item.qty4No}`);
+      return parts.join(" | ") || "None";
+    } else {
+      const parts = [];
+      if (item.qty40 != null && item.qty40 !== "") parts.push(`Qty-40: ${item.qty40}`);
+      if (item.qty25 != null && item.qty25 !== "") parts.push(`Qty-25: ${item.qty25}`);
+      if (item.qty20 != null && item.qty20 !== "") parts.push(`Qty-20: ${item.qty20}`);
+      return parts.join(" | ") || "None";
+    }
+  };
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -55,15 +70,19 @@ export function DeleteEntryDialog({
               </span>
             ) : entry ? (
               <div className="space-y-2">
-                <p>Are you sure you want to delete this recent entry?</p>
+                <p>Are you sure you want to delete this entry?</p>
                 <div className="rounded-xl border border-border bg-muted/40 p-3 text-xs space-y-1.5 font-mono text-foreground">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground font-sans">Product:</span>
-                    <span className="font-semibold text-foreground">{entry.product}</span>
+                    <span className="text-muted-foreground font-sans">Sheet:</span>
+                    <span className="font-semibold text-foreground">{entry.sheetName}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground font-sans">Quantity:</span>
-                    <span className="font-bold text-primary">{entry.quantity} {displayUnit}</span>
+                    <span className="text-muted-foreground font-sans">Material:</span>
+                    <span className="font-semibold text-foreground">{entry.material}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground font-sans">Quantities:</span>
+                    <span className="font-bold text-primary">{getQtySummary(entry)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground font-sans">Date:</span>
@@ -97,3 +116,4 @@ export function DeleteEntryDialog({
     </AlertDialog>
   );
 }
+
