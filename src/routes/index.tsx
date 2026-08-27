@@ -14,6 +14,13 @@ import {
   Layers,
   FileSpreadsheet,
   Check,
+  Truck,
+  Factory,
+  Clock,
+  Building2,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ArrowDownUp,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -40,8 +47,10 @@ import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { DeleteEntryDialog } from "@/components/delete-entry-dialog";
 import {
   APPS_SCRIPT_CODE,
-  SHEETS,
+  MACHINE_SHEETS,
+  TASKS,
   PREDEFINED_MATERIALS,
+  PREDEFINED_TRANSPORTERS,
   appendRow,
   formatDateDDMMMYYYY,
   loadConfig,
@@ -53,7 +62,9 @@ import {
   todayISO,
   type AppConfig,
   type LogEntry,
+  type MachineSheet,
   type SheetType,
+  type TaskType,
 } from "@/lib/stocklog";
 
 export const Route = createFileRoute("/")({
@@ -63,12 +74,12 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Record Date, Material, and sheet-specific quantities directly to PUL-32, PUL-25, or Sieving tabs in your Google Sheets.",
+          "Pick a task — Machines (PUL-32, PUL-25, Sieving) or Logistics (truck IN–OUT timings) — and log entries straight to your Google Sheets.",
       },
       { property: "og:title", content: "StockLog - Multi-Sheet Stock Manager" },
       {
         property: "og:description",
-        content: "Log PUL-32, PUL-25, and Sieving stock entries directly to Google Sheets.",
+        content: "Log machine production and truck logistics entries directly to Google Sheets.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -78,7 +89,12 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const [activeSheet, setActiveSheet] = useState<SheetType>("PUL-32");
+  // Step 1: which task the user is doing. Step 2 (below) adapts to it.
+  const [task, setTask] = useState<TaskType>("Machines");
+  // Which machine tab is active (only relevant when task === "Machines").
+  const [machineSheet, setMachineSheet] = useState<MachineSheet>("PUL-32");
+  // The physical Google Sheet tab this entry targets.
+  const targetSheet: SheetType = task === "Logistics" ? "Logistics" : machineSheet;
   const [materials, setMaterials] = useState<string[]>([...PREDEFINED_MATERIALS]);
   const [config, setConfig] = useState<AppConfig>({
     scriptUrl: "",
@@ -101,6 +117,13 @@ function Index() {
   const [qty2No, setQty2No] = useState("");
   const [qty3No, setQty3No] = useState("");
   const [qty4No, setQty4No] = useState("");
+
+  // Fields for Logistics
+  const [vehicleNo, setVehicleNo] = useState("");
+  const [transporter, setTransporter] = useState("");
+  const [movement, setMovement] = useState<"In" | "Out">("In");
+  const [inTime, setInTime] = useState("");
+  const [outTime, setOutTime] = useState("");
 
   const [newMaterial, setNewMaterial] = useState("");
   const [saving, setSaving] = useState(false);
@@ -214,6 +237,11 @@ function Index() {
     setQty2No("");
     setQty3No("");
     setQty4No("");
+    setVehicleNo("");
+    setTransporter("");
+    setMovement("In");
+    setInTime("");
+    setOutTime("");
   };
 
   const submit = async () => {
@@ -222,11 +250,20 @@ function Index() {
       return;
     }
     if (!material) {
-      toast.error("Select a material");
+      toast.error(task === "Logistics" ? "Select the material the vehicle carried" : "Select a material");
       return;
     }
 
-    if (activeSheet === "Sieving") {
+    if (task === "Logistics") {
+      if (!vehicleNo.trim()) {
+        toast.error("Enter the vehicle / number plate");
+        return;
+      }
+      if (!inTime && !outTime) {
+        toast.error("Enter at least an In-Time or Out-Time");
+        return;
+      }
+    } else if (targetSheet === "Sieving") {
       if (!qty1No && !qty2No && !qty3No && !qty4No) {
         toast.error("Enter at least one quantity value (1-No, 2-No, 3-No, or 4-No)");
         return;
@@ -241,25 +278,31 @@ function Index() {
     const formattedDate = formatDateDDMMMYYYY(date);
     setSaving(true);
 
+    const fields =
+      task === "Logistics"
+        ? { vehicleNo: vehicleNo.trim(), transporter: transporter.trim(), movement, inTime, outTime }
+        : targetSheet === "Sieving"
+          ? { qty1No, qty2No, qty3No, qty4No }
+          : { qty40, qty25, qty20 };
+
     const payload = {
-      sheetName: activeSheet,
+      sheetName: targetSheet,
       date: formattedDate,
       material,
-      ...(activeSheet === "Sieving"
-        ? { qty1No, qty2No, qty3No, qty4No }
-        : { qty40, qty25, qty20 }),
+      ...fields,
     };
 
     const entry: LogEntry = {
       id: crypto.randomUUID(),
-      sheetName: activeSheet,
+      task,
+      sheetName: targetSheet,
       date: formattedDate,
       material,
-      ...(activeSheet === "Sieving"
-        ? { qty1No, qty2No, qty3No, qty4No }
-        : { qty40, qty25, qty20 }),
+      ...fields,
       synced: false,
     };
+
+    const subject = task === "Logistics" ? vehicleNo.trim() : material;
 
     try {
       const res = await appendRow(config, payload);
@@ -267,9 +310,9 @@ function Index() {
       entry.syncedCount = res.syncedCount;
 
       if (res.syncedCount > 1) {
-        toast.success(`Appended ${material} entry to ${activeSheet} in 2 Google Sheets (Email 1 & Email 2)!`);
+        toast.success(`Logged ${subject} to ${targetSheet} in 2 Google Sheets (Email 1 & Email 2)!`);
       } else {
-        toast.success(`Appended ${material} entry to ${activeSheet} in Google Sheet (${formattedDate})`);
+        toast.success(`Logged ${subject} to ${targetSheet} in Google Sheet (${formattedDate})`);
       }
       if (res.errors && res.errors.length > 0) {
         toast.warning(`Note: ${res.errors.join("; ")}`);
@@ -335,40 +378,78 @@ function Index() {
           </div>
         )}
 
-        {/* Sheet Selection Mobile Segmented Control */}
+        {/* Step 1 — Task Selection */}
         <section className="rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm space-y-2">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Layers className="size-3.5 text-primary" /> Target Sheet Tab
+              <Layers className="size-3.5 text-primary" /> Select Task
             </h2>
             <span className="text-[11px] font-semibold text-primary bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
-              Active: {activeSheet}
+              {task}
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 bg-blue-50/60 p-1.5 rounded-xl border border-blue-100/60">
-            {SHEETS.map((s) => {
-              const isActive = activeSheet === s.id;
+          <div className="grid grid-cols-2 gap-2 bg-blue-50/60 p-1.5 rounded-xl border border-blue-100/60">
+            {TASKS.map((t) => {
+              const isActive = task === t.id;
+              const Icon = t.id === "Logistics" ? Truck : Factory;
               return (
                 <button
-                  key={s.id}
+                  key={t.id}
                   onClick={() => {
-                    setActiveSheet(s.id);
+                    setTask(t.id);
                     clearForm();
                   }}
-                  className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-lg text-center transition-all ${
+                  className={`flex items-center justify-center gap-2 py-3 px-3 rounded-lg text-center transition-all ${
                     isActive
                       ? "bg-primary text-white font-bold shadow-md shadow-primary/25"
                       : "text-slate-600 hover:text-slate-900 font-medium hover:bg-white/50"
                   }`}
                 >
-                  <FileSpreadsheet className={`size-4 mb-0.5 ${isActive ? "text-white" : "text-slate-500"}`} />
-                  <span className="text-xs font-bold">{s.label}</span>
+                  <Icon className={`size-4 ${isActive ? "text-white" : "text-slate-500"}`} />
+                  <span className="text-sm font-bold">{t.label}</span>
                 </button>
               );
             })}
           </div>
         </section>
+
+        {/* Step 2 (Machines) — pick the machine sheet tab */}
+        {task === "Machines" && (
+          <section className="rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <FileSpreadsheet className="size-3.5 text-primary" /> Machine Sheet
+              </h2>
+              <span className="text-[11px] font-semibold text-primary bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                Active: {machineSheet}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 bg-blue-50/60 p-1.5 rounded-xl border border-blue-100/60">
+              {MACHINE_SHEETS.map((s) => {
+                const isActive = machineSheet === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      setMachineSheet(s.id);
+                      clearForm();
+                    }}
+                    className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-lg text-center transition-all ${
+                      isActive
+                        ? "bg-primary text-white font-bold shadow-md shadow-primary/25"
+                        : "text-slate-600 hover:text-slate-900 font-medium hover:bg-white/50"
+                    }`}
+                  >
+                    <FileSpreadsheet className={`size-4 mb-0.5 ${isActive ? "text-white" : "text-slate-500"}`} />
+                    <span className="text-xs font-bold">{s.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Main Entry Form Card */}
         <section className="rounded-2xl border border-blue-100 bg-white p-4 sm:p-5 shadow-sm space-y-4">
@@ -378,7 +459,7 @@ function Index() {
                 <Plus className="size-4" />
               </span>
               <h2 className="text-sm font-bold text-slate-900">
-                New Entry for <span className="text-primary font-black">{activeSheet}</span>
+                New Entry for <span className="text-primary font-black">{targetSheet}</span>
               </h2>
             </div>
             <span className="text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
@@ -444,7 +525,120 @@ function Index() {
             </div>
 
             {/* Dynamic Column Inputs */}
-            {activeSheet === "Sieving" ? (
+            {task === "Logistics" ? (
+              <div className="space-y-3.5 rounded-xl border border-blue-100 bg-blue-50/40 p-3.5 sm:p-4">
+                <Label className="text-xs font-bold uppercase tracking-wider text-primary block">
+                  Logistics Details
+                </Label>
+
+                {/* Vehicle / Number Plate */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="vehicleNo" className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
+                    <Truck className="size-3.5 text-primary" /> Vehicle / Number Plate
+                  </Label>
+                  <Input
+                    id="vehicleNo"
+                    type="text"
+                    value={vehicleNo}
+                    onChange={(e) => setVehicleNo(e.target.value.toUpperCase())}
+                    autoCapitalize="characters"
+                    className="rounded-xl h-11 bg-white border-blue-200 font-bold tracking-wider uppercase text-primary text-base"
+                  />
+                </div>
+
+                {/* Transporter Name (+ quick picks) */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="transporter" className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
+                    <Building2 className="size-3.5 text-primary" /> Transporter Name
+                  </Label>
+                  <Input
+                    id="transporter"
+                    type="text"
+                    value={transporter}
+                    onChange={(e) => setTransporter(e.target.value)}
+                    className="rounded-xl h-11 bg-white border-blue-200 font-semibold text-primary text-base"
+                  />
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {PREDEFINED_TRANSPORTERS.map((t) => {
+                      const isSelected = transporter === t;
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setTransporter(t)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                            isSelected
+                              ? "bg-primary text-white border-primary shadow-xs"
+                              : "bg-white text-slate-700 border-blue-200 hover:bg-blue-50 hover:text-primary"
+                          }`}
+                        >
+                          {isSelected && <Check className="inline-block size-3 mr-1" />}
+                          {t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Movement — goods arrived at facility (In) or sent out (Out) */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
+                    <ArrowDownUp className="size-3.5 text-primary" /> Movement
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["In", "Out"] as const).map((m) => {
+                      const isSelected = movement === m;
+                      const Icon = m === "In" ? ArrowDownToLine : ArrowUpFromLine;
+                      const activeCls =
+                        m === "In"
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                          : "bg-red-500 text-white border-red-500 shadow-xs";
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setMovement(m)}
+                          className={`flex items-center justify-center gap-1.5 h-11 rounded-xl text-sm font-bold transition-all border ${
+                            isSelected ? activeCls : "bg-white text-slate-600 border-blue-200 hover:bg-blue-50"
+                          }`}
+                        >
+                          <Icon className="size-4" />
+                          {m === "In" ? "In (Arrived)" : "Out (Sent)"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* In-Time / Out-Time */}
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="inTime" className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
+                      <Clock className="size-3.5 text-emerald-600" /> In-Time
+                    </Label>
+                    <Input
+                      id="inTime"
+                      type="time"
+                      value={inTime}
+                      onChange={(e) => setInTime(e.target.value)}
+                      className="rounded-xl h-11 bg-white border-blue-200 font-bold text-center text-primary text-base"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="outTime" className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
+                      <Clock className="size-3.5 text-red-500" /> Out-Time
+                    </Label>
+                    <Input
+                      id="outTime"
+                      type="time"
+                      value={outTime}
+                      onChange={(e) => setOutTime(e.target.value)}
+                      className="rounded-xl h-11 bg-white border-blue-200 font-bold text-center text-primary text-base"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : targetSheet === "Sieving" ? (
               <div className="space-y-2 rounded-xl border border-blue-100 bg-blue-50/40 p-3.5 sm:p-4">
                 <Label className="text-xs font-bold uppercase tracking-wider text-primary block mb-2">
                   Sieving Quantities (1-No, 2-No, 3-No, 4-No)
@@ -503,7 +697,7 @@ function Index() {
             ) : (
               <div className="space-y-2 rounded-xl border border-blue-100 bg-blue-50/40 p-3.5 sm:p-4">
                 <Label className="text-xs font-bold uppercase tracking-wider text-primary block mb-2">
-                  {activeSheet} Quantities (Qty-40, Qty-25, Qty-20)
+                  {machineSheet} Quantities (Qty-40, Qty-25, Qty-20)
                 </Label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
                   <div className="space-y-1">
@@ -548,7 +742,7 @@ function Index() {
 
             <Button className="h-12 w-full text-base font-bold rounded-xl bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20" onClick={submit} disabled={saving}>
               {saving ? <Loader2 className="size-5 animate-spin" /> : <Plus className="size-5" />}
-              {saving ? `Saving to ${activeSheet}...` : `Append Row to ${activeSheet}`}
+              {saving ? `Saving to ${targetSheet}...` : `Append Row to ${targetSheet}`}
             </Button>
           </div>
         </section>
@@ -625,6 +819,7 @@ function Index() {
                   <SelectItem value="PUL-32">PUL-32</SelectItem>
                   <SelectItem value="PUL-25">PUL-25</SelectItem>
                   <SelectItem value="Sieving">Sieving</SelectItem>
+                  <SelectItem value="Logistics">Logistics</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -664,7 +859,19 @@ function Index() {
 
                 <div className="flex items-center gap-2.5 justify-between sm:justify-end">
                   <div className="text-xs font-mono bg-white border border-blue-100 px-2.5 py-1 rounded-lg shadow-2xs">
-                    {e.sheetName === "Sieving" ? (
+                    {e.sheetName === "Logistics" ? (
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-800">
+                        {e.vehicleNo && <span className="font-extrabold tracking-wider text-primary">{e.vehicleNo}</span>}
+                        {e.transporter && <span className="text-slate-500 font-semibold">{e.transporter}</span>}
+                        {e.movement && (
+                          <span className={`font-bold ${e.movement === "In" ? "text-emerald-600" : "text-red-500"}`}>
+                            {e.movement}
+                          </span>
+                        )}
+                        {e.inTime && <span>In: <b className="text-emerald-600">{e.inTime}</b></span>}
+                        {e.outTime && <span>Out: <b className="text-red-500">{e.outTime}</b></span>}
+                      </div>
+                    ) : e.sheetName === "Sieving" ? (
                       <div className="flex gap-2 text-slate-800">
                         {e.qty1No != null && e.qty1No !== "" && <span>1-No: <b className="text-primary">{e.qty1No}</b></span>}
                         {e.qty2No != null && e.qty2No !== "" && <span>2-No: <b className="text-primary">{e.qty2No}</b></span>}

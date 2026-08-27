@@ -1,23 +1,69 @@
-export type SheetType = "PUL-32" | "PUL-25" | "Sieving";
+// A "task" is the top-level choice the user makes first. The two tasks are
+// completely separate workflows that happen to share the same Google Sheet file:
+//   - "Machines"  → production logging on the PUL-32 / PUL-25 / Sieving tabs
+//   - "Logistics" → truck / tempo IN–OUT timings on the Logistics tab
+export type TaskType = "Machines" | "Logistics";
 
-export const SHEETS: { id: SheetType; label: string; description: string }[] = [
+// Production sheets that live under the "Machines" task.
+export type MachineSheet = "PUL-32" | "PUL-25" | "Sieving";
+
+// Every physical Google Sheet tab the app can write to.
+export type SheetType = MachineSheet | "Logistics";
+
+export const TASKS: { id: TaskType; label: string; description: string }[] = [
+  {
+    id: "Machines",
+    label: "Machines",
+    description: "Log production quantities for PUL-32, PUL-25 and Sieving.",
+  },
+  {
+    id: "Logistics",
+    label: "Logistics",
+    description: "Log truck / tempo IN–OUT timings with vehicle number and material.",
+  },
+];
+
+export const MACHINE_SHEETS: { id: MachineSheet; label: string; description: string }[] = [
   { id: "PUL-32", label: "PUL-32", description: "Columns: Date, Material, Qty-40, Qty-25, Qty-20" },
   { id: "PUL-25", label: "PUL-25", description: "Columns: Date, Material, Qty-40, Qty-25, Qty-20" },
   { id: "Sieving", label: "Sieving", description: "Columns: Date, Material, 1-No, 2-No, 3-No, 4-No" },
 ];
 
+export const LOGISTICS_SHEET: { id: "Logistics"; label: string; description: string } = {
+  id: "Logistics",
+  label: "Logistics",
+  description: "Columns: Date, Vehicle No, Transporter Name, Material, Movement, In-Time, Out-Time",
+};
+
+// All sheets across both tasks (machine tabs first, then Logistics).
+export const SHEETS: { id: SheetType; label: string; description: string }[] = [
+  ...MACHINE_SHEETS,
+  LOGISTICS_SHEET,
+];
+
+/** Which task a given sheet tab belongs to. */
+export function taskForSheet(sheet: SheetType): TaskType {
+  return sheet === "Logistics" ? "Logistics" : "Machines";
+}
+
 export const PREDEFINED_MATERIALS = [
+  "RML",
   "9T",
   "5T",
   "3T",
   "20T",
   "Chamak",
   "UC4",
+  "MGO",
   "Putha",
   "CB-DN",
   "CB-PW",
   "Pen",
 ] as const;
+
+// Quick-pick transporters offered on the Logistics form. The field itself is a
+// free-text input; these are just one-tap shortcuts.
+export const PREDEFINED_TRANSPORTERS = ["SGL"] as const;
 
 const MATERIALS_KEY = "stocklog.materials";
 const CONFIG_KEY = "stocklog.config";
@@ -35,18 +81,25 @@ export type AppConfig = {
 
 export type LogEntry = {
   id: string;
+  task: TaskType;
   sheetName: SheetType;
   date: string;
   material: string;
-  // Columns for PUL-32 & PUL-25
+  // Columns for PUL-32 & PUL-25 (Machines)
   qty40?: number | string;
   qty25?: number | string;
   qty20?: number | string;
-  // Columns for Sieving
+  // Columns for Sieving (Machines)
   qty1No?: number | string;
   qty2No?: number | string;
   qty3No?: number | string;
   qty4No?: number | string;
+  // Columns for Logistics
+  vehicleNo?: string; // number plate, e.g. "GJ-01-AB-1234"
+  transporter?: string; // transporter / carrier name, e.g. "SGL"
+  movement?: "In" | "Out"; // goods arrived at facility (In) or sent out (Out)
+  inTime?: string; // "HH:mm"
+  outTime?: string; // "HH:mm"
   synced: boolean;
   syncedCount?: number;
 };
@@ -75,11 +128,11 @@ export const loadMaterials = (): string[] => {
 export const saveMaterials = (m: string[]) => write(MATERIALS_KEY, m);
 
 export const loadConfig = (): AppConfig => {
-  const envUrl = (import.meta.env.VITE_APPS_SCRIPT_URL as string) || "";
-  const envSheetId = (import.meta.env.VITE_GOOGLE_SHEET_ID as string) || "";
-  const envUrl2 = (import.meta.env.VITE_APPS_SCRIPT_URL_2 as string) || "";
-  const envSheetId2 = (import.meta.env.VITE_GOOGLE_SHEET_ID_2 as string) || "";
-  const envSheetName = (import.meta.env.VITE_GOOGLE_SHEET_NAME as string) || "PUL-32";
+  const envUrl = (import.meta.env["VITE_APPS_SCRIPT_URL"] as string) || "";
+  const envSheetId = (import.meta.env["VITE_GOOGLE_SHEET_ID"] as string) || "";
+  const envUrl2 = (import.meta.env["VITE_APPS_SCRIPT_URL_2"] as string) || "";
+  const envSheetId2 = (import.meta.env["VITE_GOOGLE_SHEET_ID_2"] as string) || "";
+  const envSheetName = (import.meta.env["VITE_GOOGLE_SHEET_NAME"] as string) || "PUL-32";
 
   const stored = read<AppConfig>(CONFIG_KEY, {
     scriptUrl: "",
@@ -113,12 +166,15 @@ export function formatDateDDMMMYYYY(dateStr: string): string {
   if (!dateStr) return "";
   const parts = dateStr.split("-");
   if (parts.length !== 3) return dateStr;
-  const year = parts[0];
-  const monthIdx = parseInt(parts[1], 10) - 1;
-  const day = parts[2].padStart(2, "0");
+
+  const [year, month, day] = parts;
+  if (!year || !month || !day) return dateStr;
+
+  const monthIdx = Number.parseInt(month, 10) - 1;
+  const safeDay = day.padStart(2, "0");
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const monthName = months[monthIdx] || parts[1];
-  return `${day}-${monthName}-${year}`;
+  const monthName = months[monthIdx] || month;
+  return `${safeDay}-${monthName}-${year}`;
 }
 
 export type AppendRowPayload = {
@@ -132,6 +188,12 @@ export type AppendRowPayload = {
   qty2No?: number | string;
   qty3No?: number | string;
   qty4No?: number | string;
+  // Logistics
+  vehicleNo?: string;
+  transporter?: string;
+  movement?: string;
+  inTime?: string;
+  outTime?: string;
 };
 
 export type SyncEndpoint = {
@@ -179,6 +241,11 @@ async function sendToEndpoint(url: string, sheetId: string, payload: AppendRowPa
       qty2No: payload.qty2No ?? "",
       qty3No: payload.qty3No ?? "",
       qty4No: payload.qty4No ?? "",
+      vehicleNo: payload.vehicleNo ?? "",
+      transporter: payload.transporter ?? "",
+      movement: payload.movement ?? "",
+      inTime: payload.inTime ?? "",
+      outTime: payload.outTime ?? "",
     }),
     redirect: "follow",
   });
@@ -251,6 +318,8 @@ export const APPS_SCRIPT_CODE = `function doPost(e) {
     if (sheet.getLastRow() === 0) {
       if (sheetName === 'Sieving') {
         sheet.appendRow(['Date', 'Material', '1-No', '2-No', '3-No', '4-No']);
+      } else if (sheetName === 'Logistics') {
+        sheet.appendRow(['Date', 'Vehicle No', 'Transporter Name', 'Material', 'Movement', 'In-Time', 'Out-Time']);
       } else {
         sheet.appendRow(['Date', 'Material', 'Qty-40', 'Qty-25', 'Qty-20']);
       }
@@ -265,6 +334,16 @@ export const APPS_SCRIPT_CODE = `function doPost(e) {
         body.qty2No !== undefined && body.qty2No !== '' ? Number(body.qty2No) : '',
         body.qty3No !== undefined && body.qty3No !== '' ? Number(body.qty3No) : '',
         body.qty4No !== undefined && body.qty4No !== '' ? Number(body.qty4No) : ''
+      ]);
+    } else if (sheetName === 'Logistics') {
+      sheet.appendRow([
+        body.date || '',
+        body.vehicleNo || '',
+        body.transporter || '',
+        body.material || '',
+        body.movement || '',
+        body.inTime || '',
+        body.outTime || ''
       ]);
     } else {
       sheet.appendRow([

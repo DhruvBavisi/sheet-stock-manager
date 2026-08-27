@@ -40,6 +40,11 @@ async function sendToEndpoint(endpoint: SyncEndpoint, payload: AppendRowPayload)
       qty2No: payload.qty2No ?? "",
       qty3No: payload.qty3No ?? "",
       qty4No: payload.qty4No ?? "",
+      vehicleNo: payload.vehicleNo ?? "",
+      transporter: payload.transporter ?? "",
+      movement: payload.movement ?? "",
+      inTime: payload.inTime ?? "",
+      outTime: payload.outTime ?? "",
     }),
     redirect: "follow",
   });
