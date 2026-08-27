@@ -128,11 +128,12 @@ export const loadMaterials = (): string[] => {
 export const saveMaterials = (m: string[]) => write(MATERIALS_KEY, m);
 
 export const loadConfig = (): AppConfig => {
-  const envUrl = (import.meta.env["VITE_APPS_SCRIPT_URL"] as string) || "";
-  const envSheetId = (import.meta.env["VITE_GOOGLE_SHEET_ID"] as string) || "";
-  const envUrl2 = (import.meta.env["VITE_APPS_SCRIPT_URL_2"] as string) || "";
-  const envSheetId2 = (import.meta.env["VITE_GOOGLE_SHEET_ID_2"] as string) || "";
-  const envSheetName = (import.meta.env["VITE_GOOGLE_SHEET_NAME"] as string) || "PUL-32";
+  const env = import.meta.env as Record<string, string | undefined>;
+  const envUrl = (env["APPS_SCRIPT_URL"] ?? "") as string;
+  const envSheetId = (env["GOOGLE_SHEET_ID"] ?? "") as string;
+  const envUrl2 = (env["APPS_SCRIPT_URL_2"] ?? "") as string;
+  const envSheetId2 = (env["GOOGLE_SHEET_ID_2"] ?? "") as string;
+  const envSheetName = (env["GOOGLE_SHEET_NAME"] ?? "PUL-32") as string;
 
   const stored = read<AppConfig>(CONFIG_KEY, {
     scriptUrl: "",

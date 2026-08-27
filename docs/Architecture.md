@@ -175,8 +175,8 @@ local log.
 - **SSR** via TanStack Start; the same routes render on server and hydrate on client.
 - **Deploy:** Nitro `preset: "vercel"` — builds to Vercel's serverless output.
 - **Config sources** (read in `loadConfig`): env vars
-  `VITE_APPS_SCRIPT_URL`, `VITE_GOOGLE_SHEET_ID`, `VITE_APPS_SCRIPT_URL_2`,
-  `VITE_GOOGLE_SHEET_ID_2`, `VITE_GOOGLE_SHEET_NAME` — falling back to `localStorage` (Settings dialog).
+  `APPS_SCRIPT_URL`, `GOOGLE_SHEET_ID`, `APPS_SCRIPT_URL_2`,
+  `GOOGLE_SHEET_ID_2`, `GOOGLE_SHEET_NAME` — falling back to `localStorage` (Settings dialog).
 
 ---
 

@@ -374,7 +374,7 @@ function Index() {
         {ready && !configured && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs sm:text-sm text-amber-900 font-medium flex items-start sm:items-center gap-3 shadow-xs">
             <Lock className="size-4 shrink-0 text-amber-600 mt-0.5 sm:mt-0" />
-            <span>Please set <b>VITE_APPS_SCRIPT_URL</b> and <b>VITE_GOOGLE_SHEET_ID</b> in your <code>.env</code> file to enable Google Sheets sync.</span>
+            <span>Please set <b>APPS_SCRIPT_URL</b> and <b>GOOGLE_SHEET_ID</b> in your <code>.env</code> file to enable Google Sheets sync.</span>
           </div>
         )}
 
@@ -950,8 +950,8 @@ function SettingsDialog({
 
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-primary font-medium space-y-1">
             <p><b>Dual Email Instructions:</b></p>
-            <p>1. Deploy the Apps Script in <b>Google Account 1</b> & paste its URL/Sheet ID as <code>VITE_APPS_SCRIPT_URL</code> & <code>VITE_GOOGLE_SHEET_ID</code>.</p>
-            <p>2. Deploy the Apps Script in <b>Google Account 2</b> & paste its URL/Sheet ID as <code>VITE_APPS_SCRIPT_URL_2</code> & <code>VITE_GOOGLE_SHEET_ID_2</code>.</p>
+            <p>1. Deploy the Apps Script in <b>Google Account 1</b> & paste its URL/Sheet ID as <code>APPS_SCRIPT_URL</code> & <code>GOOGLE_SHEET_ID</code>.</p>
+            <p>2. Deploy the Apps Script in <b>Google Account 2</b> & paste its URL/Sheet ID as <code>APPS_SCRIPT_URL_2</code> & <code>GOOGLE_SHEET_ID_2</code>.</p>
           </div>
 
           <div className="space-y-2">

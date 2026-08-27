@@ -22,8 +22,8 @@
  *   3. Deploy → New deployment → type "Web app".
  *        • Execute as:      Me
  *        • Who has access:  Anyone
- *   4. Copy the /exec Web App URL into the app's Settings (or VITE_APPS_SCRIPT_URL).
- *   5. Put the Google Sheet ID (from its URL) into VITE_GOOGLE_SHEET_ID.
+ *   4. Copy the /exec Web App URL into the app's Settings (or APPS_SCRIPT_URL).
+ *   5. Put the Google Sheet ID (from its URL) into GOOGLE_SHEET_ID.
  *   For dual-account sync, repeat for the 2nd account and use the *_2 vars.
  */
 function doPost(e) {
