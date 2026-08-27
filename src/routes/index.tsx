@@ -256,7 +256,7 @@ function Index() {
 
     if (task === "Logistics") {
       if (!vehicleNo.trim()) {
-        toast.error("Enter the vehicle / number plate");
+        toast.error("Enter the vehicle number");
         return;
       }
       if (!inTime && !outTime) {
@@ -534,7 +534,7 @@ function Index() {
                 {/* Vehicle / Number Plate */}
                 <div className="space-y-1.5">
                   <Label htmlFor="vehicleNo" className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
-                    <Truck className="size-3.5 text-primary" /> Vehicle / Number Plate
+                    <Truck className="size-3.5 text-primary" /> Vehicle Number
                   </Label>
                   <Input
                     id="vehicleNo"
@@ -621,7 +621,7 @@ function Index() {
                       type="time"
                       value={inTime}
                       onChange={(e) => setInTime(e.target.value)}
-                      className="rounded-xl h-11 bg-white border-blue-200 font-bold text-center text-primary text-base"
+                      className="rounded-xl h-10 sm:h-11 bg-white border-blue-200 font-bold text-center text-primary text-sm sm:text-base"
                     />
                   </div>
                   <div className="space-y-1">
@@ -633,7 +633,7 @@ function Index() {
                       type="time"
                       value={outTime}
                       onChange={(e) => setOutTime(e.target.value)}
-                      className="rounded-xl h-11 bg-white border-blue-200 font-bold text-center text-primary text-base"
+                      className="rounded-xl h-10 sm:h-11 bg-white border-blue-200 font-bold text-center text-primary text-sm sm:text-base"
                     />
                   </div>
                 </div>
