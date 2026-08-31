@@ -6,6 +6,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import { nitro } from "nitro/vite";
 
 export default defineConfig({
+  envPrefix: ["VITE_", "APPS_SCRIPT_", "GOOGLE_SHEET_"],
   plugins: [
     tsconfigPaths({ projects: ["./tsconfig.json"] }),
     tailwindcss(),

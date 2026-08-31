@@ -7,7 +7,7 @@
 > **Update protocol:** after any meaningful change, append to §7 (Change log) and adjust §2 (Status)
 > and §5 (Known limitations). Keep entries short and dated. Convert relative dates to absolute.
 
-**Last updated:** 2026-08-27
+**Last updated:** 2026-08-31
 
 ---
 
@@ -27,8 +27,9 @@ fans out to each Apps Script endpoint. See [`PRD.md`](./PRD.md) and [`Architectu
 
 - ✅ **Two-task flow:** Step 1 picks the task (Machines / Logistics); the flow adapts.
 - ✅ **Machines:** single-screen entry; 3 sheet types (PUL-32, PUL-25, Sieving) with distinct columns.
-- ✅ **Logistics:** truck / tempo IN–OUT logging — vehicle no + In/Out time pickers + material,
-  on its own `Logistics` tab (`Date, Vehicle No, Material, In-Time, Out-Time`).
+- ✅ **Logistics:** truck / tempo IN–OUT logging — vehicle no + transporter (free-text, "SGL"
+  quick-pick) + movement In/Out toggle + In/Out time pickers + material, on its own `Logistics` tab
+  (`Date, Vehicle No, Transporter Name, Material, Movement, In-Time, Out-Time`).
 - ✅ Predefined + custom materials (shared by both tasks); local recent log (localStorage, capped
   100, shows 20, filterable incl. Logistics).
 - ✅ Google Sheets sync via Apps Script through `/api/sheets`; row shape per `sheetName`.
@@ -120,6 +121,19 @@ full dark-mode wiring, zod validation on the main form. See [`Phases.md`](./Phas
 
 > Append newest at the top. Dates absolute.
 
+- **2026-08-31** — **Logistics columns + mobile responsiveness.** Added two Logistics columns —
+  **Transporter Name** (free-text `<Input>` with an `SGL` quick-pick chip, backed by new
+  `PREDEFINED_TRANSPORTERS`) and **Movement** (an In/Out segmented toggle; In = goods arrived, Out =
+  goods sent). Locked the Logistics column order to `Date, Vehicle No, Transporter Name, Material,
+  Movement, In-Time, Out-Time` in `LOGISTICS_SHEET`, `APPS_SCRIPT_CODE`, and `docs/apps-script.gs`.
+  Extended `LogEntry`/`AppendRowPayload` (`transporter`, `movement`) and both sync bodies
+  (`stocklog.ts` client + `api/sheets.ts` server). Removed the vehicle-number placeholder and the
+  literal "Step 1 ·"/"Step 2 ·" heading text. **Responsiveness pass:** rebuilt the recent-log card
+  as a stacked single-column layout (top row = badge/material/date + sync/delete; full-width detail
+  chip below) so it never overflows on a phone; added `min-w-0`/`truncate`/`flex-wrap`/`shrink-0`
+  guards on the entry header and log filter; the Movement toggle hides its "(Arrived)/(Sent)" suffix
+  below 360px. Verified `npm run build` passes. Could not run the in-app mobile preview (port 8080
+  was held by a running dev server and URL-attach preview is disabled on this install). Docs updated.
 - **2026-08-27** — **Phase 7: task separation & Logistics.** Introduced `TaskType`
   (Machines/Logistics) + `MachineSheet`; added the two-step Step 1 (task) / Step 2 (machine sheet)
   flow in `index.tsx` with a derived `targetSheet`. Added the **Logistics** tab

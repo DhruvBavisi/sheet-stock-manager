@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { type AppendRowPayload, type SyncEndpoint } from "@/lib/stocklog";
+import { normalizeAppendRowPayload, type AppendRowPayload, type SyncEndpoint } from "@/lib/stocklog";
 
 type SyncRequestBody = {
   endpoints?: SyncEndpoint[];
@@ -25,26 +25,40 @@ async function retry<T>(task: () => Promise<T>, attempts = 2) {
 }
 
 async function sendToEndpoint(endpoint: SyncEndpoint, payload: AppendRowPayload) {
+  const cleanPayload = normalizeAppendRowPayload(payload);
+  const legacyQuantity = cleanPayload.sheetName === "Sieving"
+    ? cleanPayload.qty1No ?? ""
+    : cleanPayload.sheetName === "Logistics"
+      ? ""
+      : cleanPayload.qty40 ?? "";
   const res = await fetch(endpoint.url, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({
       sheetId: endpoint.sheetId.trim(),
-      sheetName: payload.sheetName,
-      date: payload.date,
-      material: payload.material,
-      qty40: payload.qty40 ?? "",
-      qty25: payload.qty25 ?? "",
-      qty20: payload.qty20 ?? "",
-      qty1No: payload.qty1No ?? "",
-      qty2No: payload.qty2No ?? "",
-      qty3No: payload.qty3No ?? "",
-      qty4No: payload.qty4No ?? "",
-      vehicleNo: payload.vehicleNo ?? "",
-      transporter: payload.transporter ?? "",
-      movement: payload.movement ?? "",
-      inTime: payload.inTime ?? "",
-      outTime: payload.outTime ?? "",
+      sheetName: cleanPayload.sheetName,
+      product: cleanPayload.material,
+      quantity: legacyQuantity,
+      formattedQuantity: legacyQuantity,
+      vehicleNumber: cleanPayload.vehicleNo ?? "",
+      transporterName: cleanPayload.transporter ?? "",
+      movementType: cleanPayload.movement ?? "",
+      entryTime: cleanPayload.inTime ?? "",
+      exitTime: cleanPayload.outTime ?? "",
+      date: cleanPayload.date,
+      material: cleanPayload.material,
+      qty40: cleanPayload.qty40 ?? "",
+      qty25: cleanPayload.qty25 ?? "",
+      qty20: cleanPayload.qty20 ?? "",
+      qty1No: cleanPayload.qty1No ?? "",
+      qty2No: cleanPayload.qty2No ?? "",
+      qty3No: cleanPayload.qty3No ?? "",
+      qty4No: cleanPayload.qty4No ?? "",
+      vehicleNo: cleanPayload.vehicleNo ?? "",
+      transporter: cleanPayload.transporter ?? "",
+      movement: cleanPayload.movement ?? "",
+      inTime: cleanPayload.inTime ?? "",
+      outTime: cleanPayload.outTime ?? "",
     }),
     redirect: "follow",
   });
@@ -74,7 +88,7 @@ export const Route = createFileRoute("/api/sheets")({
       POST: async ({ request }) => {
         const body = (await request.json()) as SyncRequestBody;
         const endpoints = body.endpoints ?? [];
-        const payload = body.payload;
+        const payload = body.payload ? normalizeAppendRowPayload(body.payload) : undefined;
 
         if (endpoints.length === 0) {
           return Response.json({ ok: false, error: "No Google Sheet endpoints configured" }, { status: 400 });

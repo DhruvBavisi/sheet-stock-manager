@@ -128,12 +128,11 @@ export const loadMaterials = (): string[] => {
 export const saveMaterials = (m: string[]) => write(MATERIALS_KEY, m);
 
 export const loadConfig = (): AppConfig => {
-  const env = import.meta.env as Record<string, string | undefined>;
-  const envUrl = (env["APPS_SCRIPT_URL"] ?? "") as string;
-  const envSheetId = (env["GOOGLE_SHEET_ID"] ?? "") as string;
-  const envUrl2 = (env["APPS_SCRIPT_URL_2"] ?? "") as string;
-  const envSheetId2 = (env["GOOGLE_SHEET_ID_2"] ?? "") as string;
-  const envSheetName = (env["GOOGLE_SHEET_NAME"] ?? "PUL-32") as string;
+  const envUrl = (import.meta.env.APPS_SCRIPT_URL ?? "") as string;
+  const envSheetId = (import.meta.env.GOOGLE_SHEET_ID ?? "") as string;
+  const envUrl2 = (import.meta.env.APPS_SCRIPT_URL_2 ?? "") as string;
+  const envSheetId2 = (import.meta.env.GOOGLE_SHEET_ID_2 ?? "") as string;
+  const envSheetName = (import.meta.env.GOOGLE_SHEET_NAME ?? "PUL-32") as string;
 
   const stored = read<AppConfig>(CONFIG_KEY, {
     scriptUrl: "",
@@ -197,6 +196,44 @@ export type AppendRowPayload = {
   outTime?: string;
 };
 
+function normalizeSheetValue(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  const raw = typeof value === "string" ? value : String(value);
+  const str = raw.trim();
+  if (!str) return "";
+
+  const lower = str.toLowerCase();
+  if (
+    lower === "undefined" ||
+    lower === "null" ||
+    lower === "nan"
+  ) {
+    return "";
+  }
+
+  return str;
+}
+
+export function normalizeAppendRowPayload(payload: AppendRowPayload): AppendRowPayload {
+  return {
+    sheetName: payload.sheetName,
+    date: normalizeSheetValue(payload.date),
+    material: normalizeSheetValue(payload.material),
+    qty40: normalizeSheetValue(payload.qty40),
+    qty25: normalizeSheetValue(payload.qty25),
+    qty20: normalizeSheetValue(payload.qty20),
+    qty1No: normalizeSheetValue(payload.qty1No),
+    qty2No: normalizeSheetValue(payload.qty2No),
+    qty3No: normalizeSheetValue(payload.qty3No),
+    qty4No: normalizeSheetValue(payload.qty4No),
+    vehicleNo: normalizeSheetValue(payload.vehicleNo),
+    transporter: normalizeSheetValue(payload.transporter),
+    movement: normalizeSheetValue(payload.movement),
+    inTime: normalizeSheetValue(payload.inTime),
+    outTime: normalizeSheetValue(payload.outTime),
+  };
+}
+
 export type SyncEndpoint = {
   name: string;
   url: string;
@@ -227,26 +264,41 @@ export function getConfiguredEndpoints(config: AppConfig): SyncEndpoint[] {
 async function sendToEndpoint(url: string, sheetId: string, payload: AppendRowPayload) {
   if (!url || !sheetId) return { ok: false, error: "Missing URL or Sheet ID" };
 
+  const cleanPayload = normalizeAppendRowPayload(payload);
+  const legacyQuantity = cleanPayload.sheetName === "Sieving"
+    ? cleanPayload.qty1No ?? ""
+    : cleanPayload.sheetName === "Logistics"
+      ? ""
+      : cleanPayload.qty40 ?? "";
+
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({
       sheetId: sheetId.trim(),
-      sheetName: payload.sheetName,
-      date: payload.date,
-      material: payload.material,
-      qty40: payload.qty40 ?? "",
-      qty25: payload.qty25 ?? "",
-      qty20: payload.qty20 ?? "",
-      qty1No: payload.qty1No ?? "",
-      qty2No: payload.qty2No ?? "",
-      qty3No: payload.qty3No ?? "",
-      qty4No: payload.qty4No ?? "",
-      vehicleNo: payload.vehicleNo ?? "",
-      transporter: payload.transporter ?? "",
-      movement: payload.movement ?? "",
-      inTime: payload.inTime ?? "",
-      outTime: payload.outTime ?? "",
+      sheetName: cleanPayload.sheetName,
+      product: cleanPayload.material,
+      quantity: legacyQuantity,
+      formattedQuantity: legacyQuantity,
+      vehicleNumber: cleanPayload.vehicleNo ?? "",
+      transporterName: cleanPayload.transporter ?? "",
+      movementType: cleanPayload.movement ?? "",
+      entryTime: cleanPayload.inTime ?? "",
+      exitTime: cleanPayload.outTime ?? "",
+      date: cleanPayload.date,
+      material: cleanPayload.material,
+      qty40: cleanPayload.qty40 ?? "",
+      qty25: cleanPayload.qty25 ?? "",
+      qty20: cleanPayload.qty20 ?? "",
+      qty1No: cleanPayload.qty1No ?? "",
+      qty2No: cleanPayload.qty2No ?? "",
+      qty3No: cleanPayload.qty3No ?? "",
+      qty4No: cleanPayload.qty4No ?? "",
+      vehicleNo: cleanPayload.vehicleNo ?? "",
+      transporter: cleanPayload.transporter ?? "",
+      movement: cleanPayload.movement ?? "",
+      inTime: cleanPayload.inTime ?? "",
+      outTime: cleanPayload.outTime ?? "",
     }),
     redirect: "follow",
   });
@@ -277,12 +329,14 @@ export async function appendRow(config: AppConfig, payload: AppendRowPayload) {
     throw new Error("No Google Sheet endpoints configured in .env");
   }
 
+  const safePayload = normalizeAppendRowPayload(payload);
+
   const res = await fetch("/api/sheets", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       endpoints,
-      payload,
+      payload: safePayload,
     }),
   });
 
@@ -308,69 +362,111 @@ export async function appendRow(config: AppConfig, payload: AppendRowPayload) {
   };
 }
 
-export const APPS_SCRIPT_CODE = `function doPost(e) {
-  try {
-    var body = JSON.parse(e.postData.contents);
-    var ss = SpreadsheetApp.openById(body.sheetId);
-    var sheetName = body.sheetName || 'PUL-32';
-    var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+export const APPS_SCRIPT_CODE = `function clean(value) {
+  if (value === undefined || value === null) return '';
+  var text = String(value).trim();
+  return text === 'undefined' || text === 'null' || text === 'NaN' ? '' : text;
+}
 
-    // Auto-create header row if sheet is empty
+function number(value) {
+  var text = clean(value);
+  if (text === '') return '';
+  var n = Number(text);
+  return isNaN(n) ? text : n;
+}
+
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'No POST data received' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var data = JSON.parse(e.postData.contents);
+    var spreadsheet = SpreadsheetApp.openById(clean(data.sheetId));
+    var name = clean(data.sheetName) || 'PUL-32';
+    var sheet = spreadsheet.getSheetByName(name) || spreadsheet.insertSheet(name);
+
+    var isSieving = name.toLowerCase() === 'sieving';
+    var isLogistics = name.toLowerCase() === 'logistics';
+
+    var defaultHeaders = isSieving
+      ? ['Date', 'Material', '1-No', '2-No', '3-No', '4-No']
+      : isLogistics
+        ? ['Date', 'Vehicle No', 'Transporter Name', 'Material', 'Movement', 'In-Time', 'Out-Time']
+        : ['Date', 'Material', 'Qty-40', 'Qty-25', 'Qty-20'];
+
     if (sheet.getLastRow() === 0) {
-      if (sheetName === 'Sieving') {
-        sheet.appendRow(['Date', 'Material', '1-No', '2-No', '3-No', '4-No']);
-      } else if (sheetName === 'Logistics') {
-        sheet.appendRow(['Date', 'Vehicle No', 'Transporter Name', 'Material', 'Movement', 'In-Time', 'Out-Time']);
+      sheet.appendRow(defaultHeaders);
+    }
+
+    var lastCol = Math.max(sheet.getLastColumn(), defaultHeaders.length);
+    var headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+
+    var valuesMap = {
+      date: clean(data.date),
+      material: clean(data.material || data.product),
+      qty40: number(data.qty40),
+      qty25: number(data.qty25),
+      qty20: number(data.qty20),
+      qty1no: number(data.qty1No),
+      qty2no: number(data.qty2No),
+      qty3no: number(data.qty3No),
+      qty4no: number(data.qty4No),
+      vehicleno: clean(data.vehicleNo || data.vehicleNumber),
+      transporter: clean(data.transporter || data.transporterName),
+      movement: clean(data.movement || data.movementType),
+      intime: clean(data.inTime || data.entryTime),
+      outtime: clean(data.outTime || data.exitTime)
+    };
+
+    var row = [];
+    var hasHeaderMatch = false;
+
+    for (var i = 0; i < headerRow.length; i++) {
+      var h = String(headerRow[i] || '').trim().toLowerCase().replace(/[\\s\\-_\\.]/g, '');
+      var val = '';
+
+      if (h === 'date') { val = valuesMap.date; hasHeaderMatch = true; }
+      else if (h === 'material' || h === 'product') { val = valuesMap.material; hasHeaderMatch = true; }
+      else if (h === 'qty40' || h === '40') { val = valuesMap.qty40; hasHeaderMatch = true; }
+      else if (h === 'qty25' || h === '25') { val = valuesMap.qty25; hasHeaderMatch = true; }
+      else if (h === 'qty20' || h === '20') { val = valuesMap.qty20; hasHeaderMatch = true; }
+      else if (h === '1no' || h === 'qty1no') { val = valuesMap.qty1no; hasHeaderMatch = true; }
+      else if (h === '2no' || h === 'qty2no') { val = valuesMap.qty2no; hasHeaderMatch = true; }
+      else if (h === '3no' || h === 'qty3no') { val = valuesMap.qty3no; hasHeaderMatch = true; }
+      else if (h === '4no' || h === 'qty4no') { val = valuesMap.qty4no; hasHeaderMatch = true; }
+      else if (h === 'vehicleno' || h === 'vehiclenumber' || h === 'vehicle') { val = valuesMap.vehicleno; hasHeaderMatch = true; }
+      else if (h === 'transportername' || h === 'transporter') { val = valuesMap.transporter; hasHeaderMatch = true; }
+      else if (h === 'movement' || h === 'movementtype') { val = valuesMap.movement; hasHeaderMatch = true; }
+      else if (h === 'intime' || h === 'entrytime') { val = valuesMap.intime; hasHeaderMatch = true; }
+      else if (h === 'outtime' || h === 'exittime') { val = valuesMap.outtime; hasHeaderMatch = true; }
+
+      row.push(val);
+    }
+
+    if (!hasHeaderMatch) {
+      if (isSieving) {
+        row = [valuesMap.date, valuesMap.material, valuesMap.qty1no, valuesMap.qty2no, valuesMap.qty3no, valuesMap.qty4no];
+      } else if (isLogistics) {
+        row = [valuesMap.date, valuesMap.vehicleno, valuesMap.transporter, valuesMap.material, valuesMap.movement, valuesMap.intime, valuesMap.outtime];
       } else {
-        sheet.appendRow(['Date', 'Material', 'Qty-40', 'Qty-25', 'Qty-20']);
+        row = [valuesMap.date, valuesMap.material, valuesMap.qty40, valuesMap.qty25, valuesMap.qty20];
       }
     }
 
-    // Append row based on sheet type
-    if (sheetName === 'Sieving') {
-      sheet.appendRow([
-        body.date || '',
-        body.material || '',
-        body.qty1No !== undefined && body.qty1No !== '' ? Number(body.qty1No) : '',
-        body.qty2No !== undefined && body.qty2No !== '' ? Number(body.qty2No) : '',
-        body.qty3No !== undefined && body.qty3No !== '' ? Number(body.qty3No) : '',
-        body.qty4No !== undefined && body.qty4No !== '' ? Number(body.qty4No) : ''
-      ]);
-    } else if (sheetName === 'Logistics') {
-      sheet.appendRow([
-        body.date || '',
-        body.vehicleNo || '',
-        body.transporter || '',
-        body.material || '',
-        body.movement || '',
-        body.inTime || '',
-        body.outTime || ''
-      ]);
-    } else {
-      sheet.appendRow([
-        body.date || '',
-        body.material || '',
-        body.qty40 !== undefined && body.qty40 !== '' ? Number(body.qty40) : '',
-        body.qty25 !== undefined && body.qty25 !== '' ? Number(body.qty25) : '',
-        body.qty20 !== undefined && body.qty20 !== '' ? Number(body.qty20) : ''
-      ]);
-    }
+    sheet.appendRow(row);
 
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: true }))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(error) })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
 function doGet() {
-  return ContentService
-    .createTextOutput(JSON.stringify({ ok: true, status: 'ready' }))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, status: 'ready' })).setMimeType(ContentService.MimeType.JSON);
 }`;
+
 
 
 

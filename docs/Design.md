@@ -127,16 +127,31 @@ soft, friendly, touch-oriented.
 - **Container:** centered, ~`max-w-3xl`, generous vertical spacing.
 - **Sticky header:** clipboard icon + "StockLog" title, stays pinned while the log scrolls.
 - **Step 1 · task selector:** a 2-up segmented control (Machines / Logistics) with `Factory` /
-  `Truck` icons; the active task chip shows the current choice.
+  `Truck` icons; the active task chip shows the current choice. (The literal "Step 1/Step 2" wording
+  was dropped — the headings now read just "Select Task" / "Machine Sheet".)
 - **Step 2 · machine-sheet selector:** a 3-up control (PUL-32 / PUL-25 / Sieving) shown **only** for
   the Machines task; hidden entirely for Logistics.
 - **Entry card:** header reads "New Entry for `{targetSheet}`". Material chips (quick-select) →
   **task-specific fields**: quantity inputs per machine sheet, or (Logistics) a vehicle/number-plate
-  input + In-Time / Out-Time `type="time"` pickers → date → Append.
+  input → transporter input with an "SGL" quick-pick chip → a Movement In/Out segmented toggle
+  (green In = arrived, red Out = sent) → In-Time / Out-Time `type="time"` pickers → date → Append.
 - **Materials manager:** add/remove custom material chips (shared by both tasks).
-- **Recent log:** latest 20 entries as cards with date, material, and either quantities or
-  vehicle/In/Out; a sync badge; filter by sheet (incl. Logistics); delete via confirmation dialog.
+- **Recent log:** latest 20 entries as cards. Each card stacks a top row (sheet badge + material +
+  date on the left, sync badge + delete on the right) above a full-width detail chip (quantities, or
+  vehicle + transporter + movement + In/Out for Logistics). This single-column, stacked layout is
+  deliberate so the card never overflows on a narrow phone. Filter by sheet (incl. Logistics);
+  delete via confirmation dialog.
 - **Settings dialog:** dual-account setup guide + copyable Apps Script code.
+
+**Responsive rules (mobile is the primary target):**
+- One column by default; `sm:` (≥640px) is the only breakpoint used to widen grids
+  (`grid-cols-1 sm:grid-cols-2/3`, quantity grids, In/Out time pair).
+- All inputs use `text-base` (16px) so iOS Safari does not zoom on focus; tap targets are `h-11`/`h-12`.
+- The Movement toggle keeps its "(Arrived)/(Sent)" suffix only above 360px (`hidden min-[360px]:inline`)
+  so the two buttons never wrap or clip on the smallest phones.
+- Header actions collapse to icons on mobile (the "Download App" label is `hidden sm:inline`).
+- Flex rows that can hold long values (log cards, entry header) use `min-w-0` + `truncate` /
+  `flex-wrap` so nothing pushes the layout wider than the viewport.
 
 ---
 

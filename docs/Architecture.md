@@ -153,7 +153,7 @@ Everything that defines *what StockLog is* lives here:
 ### `src/routes/index.tsx` — the UI
 Single-screen, controlled-component form. Manages `task` + `machineSheet` (deriving
 `targetSheet`), `materials`, `config`, `log`, the quantity fields per machine sheet, the Logistics
-fields (`vehicleNo`, `inTime`, `outTime`), and dialog/loading state. Uses `useInstallPrompt()`;
+fields (`vehicleNo`, `transporter`, `movement`, `inTime`, `outTime`), and dialog/loading state. Uses `useInstallPrompt()`;
 `submit()` validates the active task's fields → builds payload → `appendRow()` → toasts → saves to
 local log.
 

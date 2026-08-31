@@ -120,11 +120,13 @@ and reports honestly.
   `stocklog.ts`.
 - **Two-step flow** in `index.tsx`: **Step 1** picks the task; **Step 2** (machine-sheet picker)
   shows only for Machines. `targetSheet` is derived from `task` + `machineSheet`.
-- **Logistics** tab — columns `Date, Vehicle No, Material, In-Time, Out-Time`. Form adds a
-  vehicle/number-plate field (auto-uppercased) and `type="time"` In/Out pickers; `submit()`
-  validates per task (vehicle + at least one time for Logistics).
-- `LogEntry` / `AppendRowPayload` gain `task`, `vehicleNo`, `inTime`, `outTime`; the recent-log
-  filter and rows render a Logistics branch (vehicle no + In/Out).
+- **Logistics** tab — columns `Date, Vehicle No, Transporter Name, Material, Movement, In-Time, Out-Time`.
+  Form adds a vehicle/number-plate field (auto-uppercased), a **transporter** free-text field with an
+  "SGL" quick-pick, a **movement** In/Out toggle (In = arrived, Out = sent), and `type="time"` In/Out
+  pickers; `submit()` validates per task (vehicle + at least one time for Logistics).
+- `LogEntry` / `AppendRowPayload` gain `task`, `vehicleNo`, `transporter`, `movement`, `inTime`,
+  `outTime`; the recent-log filter and rows render a Logistics branch (vehicle + transporter +
+  movement + In/Out).
 - `APPS_SCRIPT_CODE` + [`docs/apps-script.gs`](./apps-script.gs) handle the Logistics header/row
   (times kept as `HH:mm` strings, not `Number()`).
 - UI kept clean and mobile-first; production and logistics stay separate workflows.

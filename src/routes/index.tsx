@@ -453,16 +453,16 @@ function Index() {
 
         {/* Main Entry Form Card */}
         <section className="rounded-2xl border border-blue-100 bg-white p-4 sm:p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-lg bg-blue-50 text-primary border border-blue-100">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-blue-50 text-primary border border-blue-100 shrink-0">
                 <Plus className="size-4" />
               </span>
-              <h2 className="text-sm font-bold text-slate-900">
+              <h2 className="text-sm font-bold text-slate-900 truncate">
                 New Entry for <span className="text-primary font-black">{targetSheet}</span>
               </h2>
             </div>
-            <span className="text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+            <span className="text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg shrink-0">
               {date}
             </span>
           </div>
@@ -602,8 +602,13 @@ function Index() {
                             isSelected ? activeCls : "bg-white text-slate-600 border-blue-200 hover:bg-blue-50"
                           }`}
                         >
-                          <Icon className="size-4" />
-                          {m === "In" ? "In (Arrived)" : "Out (Sent)"}
+                          <Icon className="size-4 shrink-0" />
+                          <span className="whitespace-nowrap">
+                            {m}
+                            <span className="hidden min-[360px]:inline font-medium">
+                              {m === "In" ? " (Arrived)" : " (Sent)"}
+                            </span>
+                          </span>
                         </button>
                       );
                     })}
@@ -809,9 +814,9 @@ function Index() {
               </Badge>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 justify-between">
               <Select value={logFilter} onValueChange={(val) => setLogFilter(val as any)}>
-                <SelectTrigger className="w-32 h-8 text-xs rounded-lg font-semibold border-slate-200">
+                <SelectTrigger className="flex-1 sm:flex-none sm:w-32 h-8 text-xs rounded-lg font-semibold border-slate-200">
                   <SelectValue placeholder="Filter Sheet" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl text-xs">
@@ -845,51 +850,22 @@ function Index() {
             {filteredLog.slice(0, 20).map((e) => (
               <div
                 key={e.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-blue-50/30 transition-colors text-xs"
+                className="flex flex-col gap-2.5 p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-blue-50/30 transition-colors text-xs"
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Badge variant="outline" className="font-mono text-xs font-extrabold border-blue-200 text-primary bg-white shrink-0">
-                    {e.sheetName}
-                  </Badge>
-                  <div className="min-w-0">
-                    <p className="font-bold text-slate-900 truncate text-sm">{e.material}</p>
-                    <p className="text-[11px] text-slate-400">{e.date}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2.5 justify-between sm:justify-end">
-                  <div className="text-xs font-mono bg-white border border-blue-100 px-2.5 py-1 rounded-lg shadow-2xs">
-                    {e.sheetName === "Logistics" ? (
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-800">
-                        {e.vehicleNo && <span className="font-extrabold tracking-wider text-primary">{e.vehicleNo}</span>}
-                        {e.transporter && <span className="text-slate-500 font-semibold">{e.transporter}</span>}
-                        {e.movement && (
-                          <span className={`font-bold ${e.movement === "In" ? "text-emerald-600" : "text-red-500"}`}>
-                            {e.movement}
-                          </span>
-                        )}
-                        {e.inTime && <span>In: <b className="text-emerald-600">{e.inTime}</b></span>}
-                        {e.outTime && <span>Out: <b className="text-red-500">{e.outTime}</b></span>}
-                      </div>
-                    ) : e.sheetName === "Sieving" ? (
-                      <div className="flex gap-2 text-slate-800">
-                        {e.qty1No != null && e.qty1No !== "" && <span>1-No: <b className="text-primary">{e.qty1No}</b></span>}
-                        {e.qty2No != null && e.qty2No !== "" && <span>2-No: <b className="text-primary">{e.qty2No}</b></span>}
-                        {e.qty3No != null && e.qty3No !== "" && <span>3-No: <b className="text-primary">{e.qty3No}</b></span>}
-                        {e.qty4No != null && e.qty4No !== "" && <span>4-No: <b className="text-primary">{e.qty4No}</b></span>}
-                      </div>
-                    ) : (
-                      <div className="flex gap-2 text-slate-800">
-                        {e.qty40 != null && e.qty40 !== "" && <span>Q40: <b className="text-primary">{e.qty40}</b></span>}
-                        {e.qty25 != null && e.qty25 !== "" && <span>Q25: <b className="text-primary">{e.qty25}</b></span>}
-                        {e.qty20 != null && e.qty20 !== "" && <span>Q20: <b className="text-primary">{e.qty20}</b></span>}
-                      </div>
-                    )}
+                <div className="flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Badge variant="outline" className="font-mono text-[11px] font-extrabold border-blue-200 text-primary bg-white shrink-0">
+                      {e.sheetName}
+                    </Badge>
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 truncate text-sm">{e.material}</p>
+                      <p className="text-[11px] text-slate-400">{e.date}</p>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <Badge variant={e.synced ? "secondary" : "destructive"} className={`text-[10px] rounded-md shrink-0 font-semibold ${e.synced ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : ""}`}>
-                      {e.synced ? (e.syncedCount && e.syncedCount > 1 ? "Dual Synced" : "Synced") : "Failed"}
+                      {e.synced ? (e.syncedCount && e.syncedCount > 1 ? "Dual" : "Synced") : "Failed"}
                     </Badge>
                     <button
                       onClick={() => openDeleteSingleDialog(e)}
@@ -899,6 +875,35 @@ function Index() {
                       <Trash2 className="size-3.5" />
                     </button>
                   </div>
+                </div>
+
+                <div className="text-xs font-mono bg-white border border-blue-100 px-2.5 py-1.5 rounded-lg shadow-2xs">
+                  {e.sheetName === "Logistics" ? (
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-slate-800">
+                      {e.vehicleNo && <span className="font-extrabold tracking-wider text-primary">{e.vehicleNo}</span>}
+                      {e.transporter && <span className="text-slate-500 font-semibold">{e.transporter}</span>}
+                      {e.movement && (
+                        <span className={`font-bold ${e.movement === "In" ? "text-emerald-600" : "text-red-500"}`}>
+                          {e.movement}
+                        </span>
+                      )}
+                      {e.inTime && <span>In: <b className="text-emerald-600">{e.inTime}</b></span>}
+                      {e.outTime && <span>Out: <b className="text-red-500">{e.outTime}</b></span>}
+                    </div>
+                  ) : e.sheetName === "Sieving" ? (
+                    <div className="flex flex-wrap gap-x-2.5 gap-y-1 text-slate-800">
+                      {e.qty1No != null && e.qty1No !== "" && <span>1-No: <b className="text-primary">{e.qty1No}</b></span>}
+                      {e.qty2No != null && e.qty2No !== "" && <span>2-No: <b className="text-primary">{e.qty2No}</b></span>}
+                      {e.qty3No != null && e.qty3No !== "" && <span>3-No: <b className="text-primary">{e.qty3No}</b></span>}
+                      {e.qty4No != null && e.qty4No !== "" && <span>4-No: <b className="text-primary">{e.qty4No}</b></span>}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-x-2.5 gap-y-1 text-slate-800">
+                      {e.qty40 != null && e.qty40 !== "" && <span>Q40: <b className="text-primary">{e.qty40}</b></span>}
+                      {e.qty25 != null && e.qty25 !== "" && <span>Q25: <b className="text-primary">{e.qty25}</b></span>}
+                      {e.qty20 != null && e.qty20 !== "" && <span>Q20: <b className="text-primary">{e.qty20}</b></span>}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

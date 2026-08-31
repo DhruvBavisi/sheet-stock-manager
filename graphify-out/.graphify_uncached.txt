@@ -1,0 +1,6 @@
+C:\Users\dhruv\OneDrive\Documents\Desktop\React\sheet-stock-manager-main\docs\Architecture.md
+C:\Users\dhruv\OneDrive\Documents\Desktop\React\sheet-stock-manager-main\docs\Design.md
+C:\Users\dhruv\OneDrive\Documents\Desktop\React\sheet-stock-manager-main\docs\Memory.md
+C:\Users\dhruv\OneDrive\Documents\Desktop\React\sheet-stock-manager-main\docs\PRD.md
+C:\Users\dhruv\OneDrive\Documents\Desktop\React\sheet-stock-manager-main\docs\Phases.md
+C:\Users\dhruv\OneDrive\Documents\Desktop\React\sheet-stock-manager-main\docs\Rules.md
