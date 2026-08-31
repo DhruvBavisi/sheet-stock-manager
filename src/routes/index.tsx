@@ -476,7 +476,7 @@ function Index() {
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="rounded-xl h-11 border-slate-200 focus:border-primary focus:ring-primary/20"
+                  className="rounded-xl h-11 w-full min-w-0 border-slate-200 focus:border-primary focus:ring-primary/20 text-sm"
                 />
               </div>
 
@@ -616,7 +616,7 @@ function Index() {
                 </div>
 
                 {/* In-Time / Out-Time */}
-                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2.5 sm:gap-3">
                   <div className="space-y-1">
                     <Label htmlFor="inTime" className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
                       <Clock className="size-3.5 text-emerald-600" /> In-Time
@@ -626,7 +626,7 @@ function Index() {
                       type="time"
                       value={inTime}
                       onChange={(e) => setInTime(e.target.value)}
-                      className="rounded-xl h-10 sm:h-11 bg-white border-blue-200 font-bold text-center text-primary text-sm sm:text-base"
+                      className="rounded-xl h-10 sm:h-11 w-full min-w-0 bg-white border-blue-200 font-bold text-primary text-sm"
                     />
                   </div>
                   <div className="space-y-1">
@@ -638,7 +638,7 @@ function Index() {
                       type="time"
                       value={outTime}
                       onChange={(e) => setOutTime(e.target.value)}
-                      className="rounded-xl h-10 sm:h-11 bg-white border-blue-200 font-bold text-center text-primary text-sm sm:text-base"
+                      className="rounded-xl h-10 sm:h-11 w-full min-w-0 bg-white border-blue-200 font-bold text-primary text-sm"
                     />
                   </div>
                 </div>

@@ -141,4 +141,26 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+
+  /* iOS Safari fix for date / time inputs */
+  input[type="date"],
+  input[type="time"] {
+    /* prevent the native iOS control from stretching beyond the cell */
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    /* kill the default -webkit appearance so our custom sizing wins */
+    -webkit-appearance: none;
+    appearance: none;
+    /* a smaller font prevents the «MM/DD/YYYY» label from overflowing */
+    font-size: 0.875rem; /* 14 px */
+    line-height: 1.25;
+  }
+
+  /* give the iOS calendar/clock icon a fixed slot so it never pushes text out */
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value {
+    text-align: left;
+    min-width: 0;
+  }
 }
