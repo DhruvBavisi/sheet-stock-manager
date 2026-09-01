@@ -774,9 +774,9 @@ function Index() {
               value={newMaterial}
               onChange={(e) => setNewMaterial(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addMaterial()}
-              className="rounded-xl h-10 border-slate-200 text-xs"
+              className="rounded-xl h-11 border-slate-200 text-base sm:text-sm"
             />
-            <Button variant="secondary" onClick={addMaterial} className="rounded-xl h-10 px-3 font-semibold text-xs bg-blue-50 text-primary border border-blue-100 hover:bg-blue-100 shrink-0">
+            <Button variant="secondary" onClick={addMaterial} className="rounded-xl h-11 px-3 font-semibold text-xs bg-blue-50 text-primary border border-blue-100 hover:bg-blue-100 shrink-0">
               <Plus className="size-3.5" /> Add
             </Button>
           </div>

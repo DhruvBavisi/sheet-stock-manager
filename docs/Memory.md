@@ -130,7 +130,9 @@ full dark-mode wiring, zod validation on the main form. See [`Phases.md`](./Phas
   **Materials manager** now allows deleting **any** material via a custom **`DeleteMaterialDialog`**
   confirmation. Finalized Logistics field rules: **movement defaults to None**, the field shows an
   asterisk and is required, **vehicle number is required**, and **both In-Time and Out-Time are
-  required**. Updated docs to match the final state.
+  required**. Also increased the custom add-material input to a minimum 16px font size so iOS
+  Safari does not auto-zoom when the operator taps into the field. Updated docs to match the final
+  state.
 - **2026-08-31** — **Logistics columns + mobile responsiveness.** Added two Logistics columns —
   **Transporter Name** (free-text `<Input>` with an `SGL` quick-pick chip, backed by new
   `PREDEFINED_TRANSPORTERS`) and **Movement** (an In/Out segmented toggle; In = goods arrived, Out =

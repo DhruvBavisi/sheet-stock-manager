@@ -145,6 +145,7 @@ soft, friendly, touch-oriented.
 - One column by default; `sm:` (≥640px) is the only breakpoint used to widen grids
   (`grid-cols-1 sm:grid-cols-2/3`, quantity grids, In/Out time pair).
 - All inputs use `text-base` (16px) so iOS Safari does not zoom on focus; tap targets are `h-11`/`h-12`.
+  The Materials manager's custom add field follows the same rule: it stays at a minimum 16px font size to avoid the iOS auto-zoom trap on mobile form entry.
 - The Movement toggle keeps its "(Arrived)/(Sent)" suffix only above 360px (`hidden min-[360px]:inline`)
   so the two buttons never wrap or clip on the smallest phones.
 - Header actions collapse to icons on mobile (the "Download App" label is `hidden sm:inline`).
