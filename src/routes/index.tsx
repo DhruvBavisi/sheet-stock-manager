@@ -501,8 +501,10 @@ function Index() {
                   type="text"
                   value={material}
                   readOnly
+                  tabIndex={-1}
                   placeholder="Select from chips below..."
-                  className="rounded-xl h-11 w-full min-w-0 border-slate-200 bg-slate-50 text-sm font-semibold text-primary cursor-not-allowed"
+                  onFocus={(e) => e.target.blur()}
+                  className="rounded-xl h-11 w-full min-w-0 border-slate-200 bg-slate-50 text-base sm:text-sm font-semibold text-primary cursor-default pointer-events-none select-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-slate-200"
                 />
               </div>
             </div>

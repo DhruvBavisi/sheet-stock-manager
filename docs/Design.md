@@ -146,6 +146,7 @@ soft, friendly, touch-oriented.
   (`grid-cols-1 sm:grid-cols-2/3`, quantity grids, In/Out time pair).
 - All inputs use `text-base` (16px) so iOS Safari does not zoom on focus; tap targets are `h-11`/`h-12`.
   The Materials manager's custom add field follows the same rule: it stays at a minimum 16px font size to avoid the iOS auto-zoom trap on mobile form entry.
+  The selected material display is intentionally non-interactive: it is a read-only, pointer-events-disabled field that does not accept focus, so it never triggers iOS zoom or the blue focus border.
 - The Movement toggle keeps its "(Arrived)/(Sent)" suffix only above 360px (`hidden min-[360px]:inline`)
   so the two buttons never wrap or clip on the smallest phones.
 - Header actions collapse to icons on mobile (the "Download App" label is `hidden sm:inline`).
