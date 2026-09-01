@@ -2,7 +2,7 @@
 
 > The project broken into manageable build steps. Phases 0–7 are **shipped** (this is how the app
 > was assembled and where each piece lives); Phase 8+ is **planned**.
-> Last updated: 2026-08-27.
+> Last updated: 2026-09-01.
 
 ---
 
@@ -121,9 +121,12 @@ and reports honestly.
 - **Two-step flow** in `index.tsx`: **Step 1** picks the task; **Step 2** (machine-sheet picker)
   shows only for Machines. `targetSheet` is derived from `task` + `machineSheet`.
 - **Logistics** tab — columns `Date, Vehicle No, Transporter Name, Material, Movement, In-Time, Out-Time`.
-  Form adds a vehicle/number-plate field (auto-uppercased), a **transporter** free-text field with an
-  "SGL" quick-pick, a **movement** In/Out toggle (In = arrived, Out = sent), and `type="time"` In/Out
-  pickers; `submit()` validates per task (vehicle + at least one time for Logistics).
+  Form adds a required vehicle/number-plate field (auto-uppercased), a **transporter** free-text field with an
+  "SGL" quick-pick, a required **movement** toggle that starts at **None** and requires the user to choose In or Out,
+  and `type="time"` In/Out pickers; `submit()` validates per task (vehicle + movement + **both** In-Time and Out-Time for Logistics).
+- Material selection uses a **read-only input** reflecting the quick-select chip choice; the
+  Materials manager allows deleting **any** material (including predefined) via a custom
+  `DeleteMaterialDialog` confirmation.
 - `LogEntry` / `AppendRowPayload` gain `task`, `vehicleNo`, `transporter`, `movement`, `inTime`,
   `outTime`; the recent-log filter and rows render a Logistics branch (vehicle + transporter +
   movement + In/Out).

@@ -7,7 +7,7 @@
 > **Update protocol:** after any meaningful change, append to §7 (Change log) and adjust §2 (Status)
 > and §5 (Known limitations). Keep entries short and dated. Convert relative dates to absolute.
 
-**Last updated:** 2026-08-31
+**Last updated:** 2026-09-01
 
 ---
 
@@ -28,10 +28,13 @@ fans out to each Apps Script endpoint. See [`PRD.md`](./PRD.md) and [`Architectu
 - ✅ **Two-task flow:** Step 1 picks the task (Machines / Logistics); the flow adapts.
 - ✅ **Machines:** single-screen entry; 3 sheet types (PUL-32, PUL-25, Sieving) with distinct columns.
 - ✅ **Logistics:** truck / tempo IN–OUT logging — vehicle no + transporter (free-text, "SGL"
-  quick-pick) + movement In/Out toggle + In/Out time pickers + material, on its own `Logistics` tab
-  (`Date, Vehicle No, Transporter Name, Material, Movement, In-Time, Out-Time`).
-- ✅ Predefined + custom materials (shared by both tasks); local recent log (localStorage, capped
-  100, shows 20, filterable incl. Logistics).
+  quick-pick) + required movement toggle defaulting to **None** until In/Out is chosen + In/Out
+  time pickers + material, on its own `Logistics` tab (`Date, Vehicle No, Transporter Name,
+  Material, Movement, In-Time, Out-Time`). Vehicle number and movement are required; both time
+  pickers are required.
+- ✅ Predefined + custom materials (shared by both tasks); material selected via quick-select chips
+  shown in a read-only input; all materials (incl. predefined) can be deleted via a confirmation
+  dialog; local recent log (localStorage, capped 100, shows 20, filterable incl. Logistics).
 - ✅ Google Sheets sync via Apps Script through `/api/sheets`; row shape per `sheetName`.
 - ✅ Dual-email simultaneous sync with `Promise.allSettled` + retry + partial-failure reporting.
 - ✅ PWA: manifest, service worker, install prompt, downloadable `.apk`/`.zip`.
@@ -121,6 +124,13 @@ full dark-mode wiring, zod validation on the main form. See [`Phases.md`](./Phas
 
 > Append newest at the top. Dates absolute.
 
+- **2026-09-01** — **Final Logistics validation + materials UX.** Replaced the material
+  dropdown with a **read-only Material input** that reflects the chip selection; the quick-select
+  chips now include all custom materials. Removed the "Quick Select Material" label. The
+  **Materials manager** now allows deleting **any** material via a custom **`DeleteMaterialDialog`**
+  confirmation. Finalized Logistics field rules: **movement defaults to None**, the field shows an
+  asterisk and is required, **vehicle number is required**, and **both In-Time and Out-Time are
+  required**. Updated docs to match the final state.
 - **2026-08-31** — **Logistics columns + mobile responsiveness.** Added two Logistics columns —
   **Transporter Name** (free-text `<Input>` with an `SGL` quick-pick chip, backed by new
   `PREDEFINED_TRANSPORTERS`) and **Movement** (an In/Out segmented toggle; In = goods arrived, Out =

@@ -1,7 +1,7 @@
 # Architecture — StockLog
 
 > How the app is put together: the flow, the stack, the folder structure, and the key modules.
-> Last updated: 2026-08-27.
+> Last updated: 2026-09-01.
 
 ---
 
@@ -15,7 +15,7 @@
 │    • Step 1: pick task (Machines / Logistics)                          │
 │    • Step 2 (Machines only): pick sheet (PUL-32 / PUL-25 / Sieving)    │
 │    • pick material; enter quantities  OR  vehicle + transporter +      │
-│      movement (In/Out) + in/out times                                  │
+│      movement (required, default: none) + in/out times                 │
 │    • submit()  → targetSheet = task === "Logistics" ? "Logistics"      │
 │                                : machineSheet                          │
 │         │                                                              │
@@ -155,7 +155,9 @@ Single-screen, controlled-component form. Manages `task` + `machineSheet` (deriv
 `targetSheet`), `materials`, `config`, `log`, the quantity fields per machine sheet, the Logistics
 fields (`vehicleNo`, `transporter`, `movement`, `inTime`, `outTime`), and dialog/loading state. Uses `useInstallPrompt()`;
 `submit()` validates the active task's fields → builds payload → `appendRow()` → toasts → saves to
-local log.
+local log. Material selection uses a **read-only input** that reflects the chip selection; all
+materials (including predefined) can be removed via the Materials manager, with a **custom
+confirmation dialog** (`DeleteMaterialDialog`) before deletion.
 
 ### App shell & server plumbing
 - [`__root.tsx`](../src/routes/__root.tsx) — `<html>` shell, head meta (viewport, `theme-color #0d3b3f`,
@@ -204,3 +206,10 @@ npm run format     # prettier --write .
 ```
 
 See [`Rules.md`](./Rules.md) for the boundaries when changing any of this.
+
+---
+
+### Updated behavior
+- **Logistics**: Vehicle number and movement are both **required**; In‑Time and Out‑Time are **both required** (asterisks shown in the UI). The validation enforces all required Logistics fields, and the movement default is **None** until the operator chooses In or Out.
+- **Material selection**: the dropdown has been removed. A **read-only input** displays the currently selected material, which is chosen via the quick‑select chips (including any custom material added by the user).
+- **Materials manager**: all materials (including predefined ones) can now be **deleted** from the list, via a custom `DeleteMaterialDialog` confirmation.

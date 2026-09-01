@@ -51,6 +51,7 @@ export const PREDEFINED_MATERIALS = [
   "9T",
   "5T",
   "3T",
+  "17T",
   "20T",
   "Chamak",
   "UC4",
@@ -97,7 +98,7 @@ export type LogEntry = {
   // Columns for Logistics
   vehicleNo?: string; // number plate, e.g. "GJ-01-AB-1234"
   transporter?: string; // transporter / carrier name, e.g. "SGL"
-  movement?: "In" | "Out"; // goods arrived at facility (In) or sent out (Out)
+  movement?: "In" | "Out" | ""; // goods arrived at facility (In) or sent out (Out)
   inTime?: string; // "HH:mm"
   outTime?: string; // "HH:mm"
   synced: boolean;
@@ -128,11 +129,11 @@ export const loadMaterials = (): string[] => {
 export const saveMaterials = (m: string[]) => write(MATERIALS_KEY, m);
 
 export const loadConfig = (): AppConfig => {
-  const envUrl = (import.meta.env.APPS_SCRIPT_URL ?? "") as string;
-  const envSheetId = (import.meta.env.GOOGLE_SHEET_ID ?? "") as string;
-  const envUrl2 = (import.meta.env.APPS_SCRIPT_URL_2 ?? "") as string;
-  const envSheetId2 = (import.meta.env.GOOGLE_SHEET_ID_2 ?? "") as string;
-  const envSheetName = (import.meta.env.GOOGLE_SHEET_NAME ?? "PUL-32") as string;
+  const envUrl = (import.meta.env["APPS_SCRIPT_URL"] ?? "") as string;
+  const envSheetId = (import.meta.env["GOOGLE_SHEET_ID"] ?? "") as string;
+  const envUrl2 = (import.meta.env["APPS_SCRIPT_URL_2"] ?? "") as string;
+  const envSheetId2 = (import.meta.env["GOOGLE_SHEET_ID_2"] ?? "") as string;
+  const envSheetName = (import.meta.env["GOOGLE_SHEET_NAME"] ?? "PUL-32") as string;
 
   const stored = read<AppConfig>(CONFIG_KEY, {
     scriptUrl: "",

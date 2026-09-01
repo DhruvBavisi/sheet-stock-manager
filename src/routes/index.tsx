@@ -45,6 +45,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { DeleteEntryDialog } from "@/components/delete-entry-dialog";
+import { DeleteMaterialDialog } from "@/components/delete-material-dialog";
 import {
   APPS_SCRIPT_CODE,
   MACHINE_SHEETS,
@@ -121,7 +122,7 @@ function Index() {
   // Fields for Logistics
   const [vehicleNo, setVehicleNo] = useState("");
   const [transporter, setTransporter] = useState("");
-  const [movement, setMovement] = useState<"In" | "Out">("In");
+  const [movement, setMovement] = useState<"In" | "Out" | "">("");
   const [inTime, setInTime] = useState("");
   const [outTime, setOutTime] = useState("");
 
@@ -134,6 +135,8 @@ function Index() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<LogEntry | null>(null);
   const [isClearAll, setIsClearAll] = useState(false);
+  const [deleteMaterialDialogOpen, setDeleteMaterialDialogOpen] = useState(false);
+  const [materialToDelete, setMaterialToDelete] = useState<string | null>(null);
 
   const { canInstall, installed, promptInstall } = useInstallPrompt();
 
@@ -192,14 +195,19 @@ function Index() {
   };
 
   const removeMaterial = (name: string) => {
-    if (PREDEFINED_MATERIALS.includes(name as any)) {
-      toast.error("Predefined materials cannot be removed");
-      return;
-    }
-    const next = materials.filter((m) => m !== name);
+    setMaterialToDelete(name);
+    setDeleteMaterialDialogOpen(true);
+  };
+
+  const confirmDeleteMaterial = () => {
+    if (!materialToDelete) return;
+    const next = materials.filter((m) => m !== materialToDelete);
     setMaterials(next);
     saveMaterials(next);
-    if (material === name) setMaterial("");
+    if (material === materialToDelete) setMaterial("");
+    toast.success(`Deleted material "${materialToDelete}"`);
+    setDeleteMaterialDialogOpen(false);
+    setMaterialToDelete(null);
   };
 
   const openDeleteSingleDialog = (e: LogEntry) => {
@@ -239,7 +247,7 @@ function Index() {
     setQty4No("");
     setVehicleNo("");
     setTransporter("");
-    setMovement("In");
+    setMovement("");
     setInTime("");
     setOutTime("");
   };
@@ -259,8 +267,12 @@ function Index() {
         toast.error("Enter the vehicle number");
         return;
       }
-      if (!inTime && !outTime) {
-        toast.error("Enter at least an In-Time or Out-Time");
+      if (!movement) {
+        toast.error("Select the movement (In or Out)");
+        return;
+      }
+      if (!inTime || !outTime) {
+        toast.error("Enter both In-Time and Out-Time");
         return;
       }
     } else if (targetSheet === "Sieving") {
@@ -481,29 +493,24 @@ function Index() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">Material Select</Label>
-                <Select value={material} onValueChange={setMaterial}>
-                  <SelectTrigger className="w-full rounded-xl h-11 font-medium border-slate-200 focus:border-primary focus:ring-primary/20">
-                    <SelectValue placeholder="Choose material..." />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-blue-100">
-                    {materials.map((m) => (
-                      <SelectItem key={m} value={m} className="font-medium text-slate-800">
-                        {m}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="material" className="text-xs font-semibold text-slate-700">
+                  Material <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="material"
+                  type="text"
+                  value={material}
+                  readOnly
+                  placeholder="Select from chips below..."
+                  className="rounded-xl h-11 w-full min-w-0 border-slate-200 bg-slate-50 text-sm font-semibold text-primary cursor-not-allowed"
+                />
               </div>
             </div>
 
-            {/* Quick Material Tap Chips for Mobile */}
+            {/* Material quick-select chips */}
             <div className="space-y-1.5">
-              <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Quick Select Material:
-              </Label>
               <div className="flex flex-wrap gap-1.5">
-                {PREDEFINED_MATERIALS.map((m) => {
+                {materials.map((m) => {
                   const isSelected = material === m;
                   return (
                     <button
@@ -534,7 +541,7 @@ function Index() {
                 {/* Vehicle / Number Plate */}
                 <div className="space-y-1.5">
                   <Label htmlFor="vehicleNo" className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
-                    <Truck className="size-3.5 text-primary" /> Vehicle Number
+                    <Truck className="size-3.5 text-primary" /> Vehicle Number <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="vehicleNo"
@@ -583,7 +590,7 @@ function Index() {
                 {/* Movement — goods arrived at facility (In) or sent out (Out) */}
                 <div className="space-y-1.5">
                   <Label className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
-                    <ArrowDownUp className="size-3.5 text-primary" /> Movement
+                    <ArrowDownUp className="size-3.5 text-primary" /> Movement <span className="text-red-500">*</span>
                   </Label>
                   <div className="grid grid-cols-2 gap-2">
                     {(["In", "Out"] as const).map((m) => {
@@ -619,7 +626,7 @@ function Index() {
                 <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2.5 sm:gap-3">
                   <div className="space-y-1">
                     <Label htmlFor="inTime" className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
-                      <Clock className="size-3.5 text-emerald-600" /> In-Time
+                      <Clock className="size-3.5 text-emerald-600" /> In-Time *
                     </Label>
                     <Input
                       id="inTime"
@@ -776,26 +783,19 @@ function Index() {
 
           <div className="flex flex-wrap gap-1.5">
             {materials.map((m) => {
-              const isPredefined = PREDEFINED_MATERIALS.includes(m as any);
               return (
                 <span
                   key={m}
-                  className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-3 pr-2 text-xs font-semibold ${
-                    isPredefined
-                      ? "border-blue-200 bg-blue-50/80 text-primary"
-                      : "border-slate-200 bg-slate-50 text-slate-700"
-                  }`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 py-1 pl-3 pr-2 text-xs font-semibold text-slate-700"
                 >
                   {m}
-                  {!isPredefined && (
-                    <button
-                      aria-label={`Remove ${m}`}
-                      onClick={() => removeMaterial(m)}
-                      className="rounded-full p-0.5 text-slate-400 transition-colors hover:bg-red-100 hover:text-red-600"
-                    >
-                      <Trash2 className="size-3" />
-                    </button>
-                  )}
+                  <button
+                    aria-label={`Remove ${m}`}
+                    onClick={() => removeMaterial(m)}
+                    className="rounded-full p-0.5 text-slate-400 transition-colors hover:bg-red-100 hover:text-red-600"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
                 </span>
               );
             })}
@@ -918,6 +918,13 @@ function Index() {
         isClearAll={isClearAll}
         totalEntriesCount={log.length}
         onConfirmDelete={confirmDelete}
+      />
+
+      <DeleteMaterialDialog
+        open={deleteMaterialDialogOpen}
+        onOpenChange={setDeleteMaterialDialogOpen}
+        materialName={materialToDelete}
+        onConfirmDelete={confirmDeleteMaterial}
       />
     </main>
   );

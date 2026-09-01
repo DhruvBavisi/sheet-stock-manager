@@ -2,7 +2,7 @@
 
 > Boundaries for anyone (human or AI) writing code in this repo: which libraries to use or avoid,
 > how to handle errors, and what not to touch. Read this before making changes.
-> Last updated: 2026-08-27.
+> Last updated: 2026-09-01.
 
 ---
 

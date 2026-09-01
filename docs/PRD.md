@@ -1,7 +1,7 @@
 # PRD — StockLog (Sheet Stock Manager)
 
 > **Product Requirements Document.** What we're building, who it's for, and what it must do.
-> Living document — reflects the current shipped scope. Last updated: 2026-08-27.
+> Living document — reflects the current shipped scope. Last updated: 2026-09-01.
 
 ---
 
@@ -82,8 +82,8 @@ but secondary.
 |---|---------|--------|-------|
 | F0 | **Task selection** (Machines vs Logistics) | ✅ Shipped | Step 1 chooses the task; the flow (Step 2 + fields) adapts. Production and logistics kept separate. |
 | F1 | **Machines multi-sheet entry** (PUL-32, PUL-25, Sieving) | ✅ Shipped | Step 2 segmented control switches active machine sheet; columns change per sheet |
-| F1b | **Logistics entry** (vehicle no + transporter + movement + IN/OUT times + material) | ✅ Shipped | Own tab `Logistics`; vehicle number auto-uppercased; transporter free-text with an "SGL" quick-pick; In/Out movement toggle; `type="time"` pickers |
-| F2 | **Material selection** — predefined + custom, quick-select chips | ✅ Shipped | 10 predefined; user can add/remove; persisted in `localStorage`; shared by both tasks |
+| F1b | **Logistics entry** (vehicle no + transporter + movement + IN/OUT times + material) | ✅ Shipped | Own tab `Logistics`; vehicle number auto-uppercased and required; transporter free-text with an "SGL" quick-pick; required movement toggle defaults to **None** until the user chooses In or Out; `type="time"` pickers for both IN and OUT are required |
+| F2 | **Material selection** — quick-select chips + read-only input | ✅ Shipped | Materials chosen via quick-select chips; a read-only input reflects the selection; all materials (incl. predefined) can be deleted via a confirmation dialog; persisted in `localStorage`; shared by both tasks |
 | F3 | **Date entry** with `dd-MMM-yyyy` display | ✅ Shipped | Defaults to today (`todayISO()`) |
 | F4 | **Append row to Google Sheets** via Apps Script | ✅ Shipped | Same-origin `/api/sheets` proxy → Apps Script Web App; row shape per `sheetName` |
 | F5 | **Dual-email simultaneous sync** | ✅ Shipped | Account 1 + Account 2; `Promise.allSettled` with retry |
@@ -117,7 +117,9 @@ sheet.
 
 **Predefined materials:** `9T, 5T, 3T, 20T, Chamak, UC4, Putha, CB-DN, CB-PW, Pen`
 (users can add their own; the merged set is deduplicated). Materials are shared by both tasks — for
-Logistics the material is *what the truck carried*. **Predefined transporters:** `SGL` — a one-tap
+Logistics the material is *what the truck carried*. Material is selected via **quick-select chips**
+and shown in a **read-only input**; any material (including predefined) can be removed from the
+list via a **confirmation dialog**. **Predefined transporters:** `SGL` — a one-tap
 quick-pick on the Logistics form; the transporter field itself is free text.
 
 A **log entry** carries: `id, task, sheetName, date, material`, the relevant quantity fields
@@ -132,10 +134,10 @@ A **log entry** carries: `id, task, sheetName, date, material`, the relevant qua
    **PUL-32**, tap **Chamak**, type the three quantities, and press **Append Row** — a row appears
    in Google Sheets and in my recent log, and I get a green toast.
 2. *As gate staff*, a tempo arrives; I switch to the **Logistics** task, type its number plate,
-   tap the **SGL** transporter chip, set **Movement** to **In** (arrived), set the **In-Time**,
-   choose the material it brought, and save. When it leaves I log a row with **Movement** set to
-   **Out** (sent) and an **Out-Time** — both land on the Logistics tab, kept separate from
-   production numbers.
+   tap the **SGL** transporter chip, set **Movement** to **In** (arrived) or **Out** (sent), set the
+   **In-Time** and **Out-Time**, choose the material it brought, and save. The movement field
+   starts at **None** and is required, and the vehicle number is required before the save can happen.
+   Both rows land on the Logistics tab, kept separate from production numbers.
 3. *As an operator*, I need to log a material that isn't in the list, so I type it into the
    material manager and it's saved as a chip for next time.
 4. *As an owner*, every entry the operator or gate staff logs also lands in **my** Google Sheet
