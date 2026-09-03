@@ -21,6 +21,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ArrowDownUp,
+  ChevronDown,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,9 +44,11 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { DeleteEntryDialog } from "@/components/delete-entry-dialog";
 import { DeleteMaterialDialog } from "@/components/delete-material-dialog";
+import { DeleteTransporterDialog } from "../components/delete-transporter-dialog";
 import {
   APPS_SCRIPT_CODE,
   MACHINE_SHEETS,
@@ -57,9 +60,11 @@ import {
   loadConfig,
   loadLog,
   loadMaterials,
+  loadTransporters,
   saveConfig,
   saveLog,
   saveMaterials,
+  saveTransporters,
   todayISO,
   type AppConfig,
   type LogEntry,
@@ -107,6 +112,7 @@ function Index() {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [material, setMaterial] = useState("");
   const [date, setDate] = useState(todayISO());
+  const [dayNight, setDayNight] = useState<"Day" | "Night" | "">("");
 
   // Fields for PUL-32 and PUL-25
   const [qty40, setQty40] = useState("");
@@ -122,11 +128,13 @@ function Index() {
   // Fields for Logistics
   const [vehicleNo, setVehicleNo] = useState("");
   const [transporter, setTransporter] = useState("");
+  const [transporters, setTransporters] = useState<string[]>([...PREDEFINED_TRANSPORTERS]);
   const [movement, setMovement] = useState<"In" | "Out" | "">("");
   const [inTime, setInTime] = useState("");
   const [outTime, setOutTime] = useState("");
 
   const [newMaterial, setNewMaterial] = useState("");
+  const [newTransporter, setNewTransporter] = useState("");
   const [saving, setSaving] = useState(false);
   const [ready, setReady] = useState(false);
   const [logFilter, setLogFilter] = useState<"ALL" | SheetType>("ALL");
@@ -137,6 +145,8 @@ function Index() {
   const [isClearAll, setIsClearAll] = useState(false);
   const [deleteMaterialDialogOpen, setDeleteMaterialDialogOpen] = useState(false);
   const [materialToDelete, setMaterialToDelete] = useState<string | null>(null);
+  const [deleteTransporterDialogOpen, setDeleteTransporterDialogOpen] = useState(false);
+  const [transporterToDelete, setTransporterToDelete] = useState<string | null>(null);
 
   const { canInstall, installed, promptInstall } = useInstallPrompt();
 
@@ -165,6 +175,7 @@ function Index() {
 
   useEffect(() => {
     setMaterials(loadMaterials());
+    setTransporters(loadTransporters());
     setConfig(loadConfig());
     setLog(loadLog());
     setReady(true);
@@ -197,6 +208,37 @@ function Index() {
   const removeMaterial = (name: string) => {
     setMaterialToDelete(name);
     setDeleteMaterialDialogOpen(true);
+  };
+
+  const addTransporter = () => {
+    const name = newTransporter.trim();
+    if (!name) return;
+    if (transporters.some((item) => item.toLowerCase() === name.toLowerCase())) {
+      toast.error("That transporter is already in the list");
+      return;
+    }
+    const next = [...transporters, name];
+    setTransporters(next);
+    saveTransporters(next);
+    setTransporter(name);
+    setNewTransporter("");
+    toast.success(`Added "${name}"`);
+  };
+
+  const removeTransporter = (name: string) => {
+    setTransporterToDelete(name);
+    setDeleteTransporterDialogOpen(true);
+  };
+
+  const confirmDeleteTransporter = () => {
+    if (!transporterToDelete) return;
+    const next = transporters.filter((item) => item !== transporterToDelete);
+    setTransporters(next);
+    saveTransporters(next);
+    if (transporter === transporterToDelete) setTransporter("");
+    toast.success(`Deleted transporter "${transporterToDelete}"`);
+    setDeleteTransporterDialogOpen(false);
+    setTransporterToDelete(null);
   };
 
   const confirmDeleteMaterial = () => {
@@ -238,6 +280,7 @@ function Index() {
   };
 
   const clearForm = () => {
+    setDayNight("");
     setQty40("");
     setQty25("");
     setQty20("");
@@ -287,6 +330,11 @@ function Index() {
       }
     }
 
+    if (task === "Machines" && !dayNight) {
+      toast.error("Select Day or Night");
+      return;
+    }
+
     const formattedDate = formatDateDDMMMYYYY(date);
     setSaving(true);
 
@@ -294,8 +342,8 @@ function Index() {
       task === "Logistics"
         ? { vehicleNo: vehicleNo.trim(), transporter: transporter.trim(), movement, inTime, outTime }
         : targetSheet === "Sieving"
-          ? { qty1No, qty2No, qty3No, qty4No }
-          : { qty40, qty25, qty20 };
+          ? { dayNight, qty1No, qty2No, qty3No, qty4No }
+          : { dayNight, qty40, qty25, qty20 };
 
     const payload = {
       sheetName: targetSheet,
@@ -492,21 +540,45 @@ function Index() {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="material" className="text-xs font-semibold text-slate-700">
-                  Material <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="material"
-                  type="text"
-                  value={material}
-                  readOnly
-                  tabIndex={-1}
-                  placeholder="Select from chips below..."
-                  onFocus={(e) => e.target.blur()}
-                  className="rounded-xl h-11 w-full min-w-0 border-slate-200 bg-slate-50 text-base sm:text-sm font-semibold text-primary cursor-default pointer-events-none select-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-slate-200"
-                />
-              </div>
+              {task === "Machines" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Shift <span className="text-red-500">*</span></Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["Day", "Night"] as const).map((shift) => (
+                      <button
+                        key={shift}
+                        type="button"
+                        onClick={() => setDayNight(shift)}
+                        className={`h-11 rounded-xl border text-sm font-bold transition-all ${
+                          dayNight === shift
+                            ? shift === "Day"
+                              ? "bg-sky-500 text-white border-sky-500 shadow-xs"
+                              : "bg-slate-800 text-white border-slate-800 shadow-xs"
+                            : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-blue-50 hover:text-primary"
+                        }`}
+                      >
+                        {shift || "None"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="material" className="text-xs font-semibold text-slate-700">
+                Material <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="material"
+                type="text"
+                value={material}
+                readOnly
+                tabIndex={-1}
+                placeholder="Select from chips below..."
+                onFocus={(e) => e.target.blur()}
+                className="rounded-xl h-11 w-full min-w-0 border-slate-200 bg-slate-50 text-base sm:text-sm font-semibold text-primary cursor-default pointer-events-none select-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-slate-200"
+              />
             </div>
 
             {/* Material quick-select chips */}
@@ -568,7 +640,7 @@ function Index() {
                     className="rounded-xl h-11 bg-white border-blue-200 font-semibold text-primary text-base"
                   />
                   <div className="flex flex-wrap gap-1.5 pt-0.5">
-                    {PREDEFINED_TRANSPORTERS.map((t) => {
+                    {transporters.map((t) => {
                       const isSelected = transporter === t;
                       return (
                         <button
@@ -761,14 +833,50 @@ function Index() {
           </div>
         </section>
 
+        <Collapsible className="rounded-2xl border border-blue-100 bg-white p-4 sm:p-5 shadow-sm">
+          <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
+            <span className="flex items-center gap-2">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Transporters List</h2>
+              <span className="text-xs text-slate-400 font-medium">{transporters.length} available</span>
+            </span>
+            <ChevronDown className="size-4 text-slate-400 transition-transform data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="collapsible-content space-y-3 pt-3">
+            <div className="flex gap-2">
+            <Input
+              placeholder="Add custom transporter"
+              value={newTransporter}
+              onChange={(e) => setNewTransporter(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addTransporter()}
+              className="rounded-xl h-11 border-slate-200 text-base sm:text-sm"
+            />
+            <Button variant="secondary" onClick={addTransporter} className="rounded-xl h-11 px-3 font-semibold text-xs bg-blue-50 text-primary border border-blue-100 hover:bg-blue-100 shrink-0">
+              <Plus className="size-3.5" /> Add
+            </Button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+            {transporters.map((item) => (
+              <span key={item} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 py-1 pl-3 pr-2 text-xs font-semibold text-slate-700">
+                {item}
+                <button aria-label={`Remove ${item}`} onClick={() => removeTransporter(item)} className="rounded-full p-0.5 text-slate-400 transition-colors hover:bg-red-100 hover:text-red-600">
+                  <Trash2 className="size-3" />
+                </button>
+              </span>
+            ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
         {/* Predefined Materials List & Manager */}
-        <section className="rounded-2xl border border-blue-100 bg-white p-4 sm:p-5 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Materials List
-            </h2>
-            <span className="text-xs text-slate-400 font-medium">{materials.length} available</span>
-          </div>
+        <Collapsible className="rounded-2xl border border-blue-100 bg-white p-4 sm:p-5 shadow-sm">
+          <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
+            <span className="flex items-center gap-2">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Materials List</h2>
+              <span className="text-xs text-slate-400 font-medium">{materials.length} available</span>
+            </span>
+            <ChevronDown className="size-4 text-slate-400 transition-transform data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="collapsible-content space-y-3 pt-3">
 
           <div className="flex gap-2">
             <Input
@@ -802,7 +910,8 @@ function Index() {
               );
             })}
           </div>
-        </section>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Recent Log Entries */}
         <section className="rounded-2xl border border-blue-100 bg-white p-4 sm:p-5 shadow-sm space-y-3">
@@ -861,7 +970,7 @@ function Index() {
                     </Badge>
                     <div className="min-w-0">
                       <p className="font-bold text-slate-900 truncate text-sm">{e.material}</p>
-                      <p className="text-[11px] text-slate-400">{e.date}</p>
+                      <p className="text-[11px] text-slate-400">{e.date}{e.dayNight ? ` · ${e.dayNight}` : ""}</p>
                     </div>
                   </div>
 
@@ -901,6 +1010,7 @@ function Index() {
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-x-2.5 gap-y-1 text-slate-800">
+                      {e.dayNight && <span>Shift: <b className="text-primary">{e.dayNight}</b></span>}
                       {e.qty40 != null && e.qty40 !== "" && <span>Q40: <b className="text-primary">{e.qty40}</b></span>}
                       {e.qty25 != null && e.qty25 !== "" && <span>Q25: <b className="text-primary">{e.qty25}</b></span>}
                       {e.qty20 != null && e.qty20 !== "" && <span>Q20: <b className="text-primary">{e.qty20}</b></span>}
@@ -927,6 +1037,13 @@ function Index() {
         onOpenChange={setDeleteMaterialDialogOpen}
         materialName={materialToDelete}
         onConfirmDelete={confirmDeleteMaterial}
+      />
+
+      <DeleteTransporterDialog
+        open={deleteTransporterDialogOpen}
+        onOpenChange={setDeleteTransporterDialogOpen}
+        transporterName={transporterToDelete}
+        onConfirmDelete={confirmDeleteTransporter}
       />
     </main>
   );

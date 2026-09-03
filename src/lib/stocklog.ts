@@ -24,9 +24,9 @@ export const TASKS: { id: TaskType; label: string; description: string }[] = [
 ];
 
 export const MACHINE_SHEETS: { id: MachineSheet; label: string; description: string }[] = [
-  { id: "PUL-32", label: "PUL-32", description: "Columns: Date, Material, Qty-40, Qty-25, Qty-20" },
-  { id: "PUL-25", label: "PUL-25", description: "Columns: Date, Material, Qty-40, Qty-25, Qty-20" },
-  { id: "Sieving", label: "Sieving", description: "Columns: Date, Material, 1-No, 2-No, 3-No, 4-No" },
+  { id: "PUL-32", label: "PUL-32", description: "Columns: Date, TIME, Material, Qty-40, Qty-25, Qty-20" },
+  { id: "PUL-25", label: "PUL-25", description: "Columns: Date, TIME, Material, Qty-40, Qty-25, Qty-20" },
+  { id: "Sieving", label: "Sieving", description: "Columns: Date, TIME, Material, 1-No, 2-No, 3-No, 4-No" },
 ];
 
 export const LOGISTICS_SHEET: { id: "Logistics"; label: string; description: string } = {
@@ -67,6 +67,7 @@ export const PREDEFINED_MATERIALS = [
 export const PREDEFINED_TRANSPORTERS = ["SGL"] as const;
 
 const MATERIALS_KEY = "stocklog.materials";
+const TRANSPORTERS_KEY = "stocklog.transporters";
 const CONFIG_KEY = "stocklog.config";
 const LOG_KEY = "stocklog.log";
 
@@ -85,6 +86,7 @@ export type LogEntry = {
   task: TaskType;
   sheetName: SheetType;
   date: string;
+  dayNight?: "Day" | "Night" | "";
   material: string;
   // Columns for PUL-32 & PUL-25 (Machines)
   qty40?: number | string;
@@ -127,6 +129,13 @@ export const loadMaterials = (): string[] => {
 };
 
 export const saveMaterials = (m: string[]) => write(MATERIALS_KEY, m);
+
+export const loadTransporters = (): string[] => {
+  const loaded = read<string[]>(TRANSPORTERS_KEY, [...PREDEFINED_TRANSPORTERS]);
+  return Array.from(new Set([...PREDEFINED_TRANSPORTERS, ...loaded]));
+};
+
+export const saveTransporters = (t: string[]) => write(TRANSPORTERS_KEY, t);
 
 export const loadConfig = (): AppConfig => {
   const envUrl = (import.meta.env["APPS_SCRIPT_URL"] ?? "") as string;
@@ -181,6 +190,7 @@ export function formatDateDDMMMYYYY(dateStr: string): string {
 export type AppendRowPayload = {
   sheetName: SheetType;
   date: string;
+  dayNight?: "Day" | "Night" | "";
   material: string;
   qty40?: number | string;
   qty25?: number | string;
@@ -219,6 +229,7 @@ export function normalizeAppendRowPayload(payload: AppendRowPayload): AppendRowP
   return {
     sheetName: payload.sheetName,
     date: normalizeSheetValue(payload.date),
+    dayNight: normalizeSheetValue(payload.dayNight) as "Day" | "Night" | "",
     material: normalizeSheetValue(payload.material),
     qty40: normalizeSheetValue(payload.qty40),
     qty25: normalizeSheetValue(payload.qty25),
@@ -287,6 +298,7 @@ async function sendToEndpoint(url: string, sheetId: string, payload: AppendRowPa
       entryTime: cleanPayload.inTime ?? "",
       exitTime: cleanPayload.outTime ?? "",
       date: cleanPayload.date,
+      dayNight: cleanPayload.dayNight ?? "",
       material: cleanPayload.material,
       qty40: cleanPayload.qty40 ?? "",
       qty25: cleanPayload.qty25 ?? "",
@@ -392,13 +404,24 @@ function doPost(e) {
     var isLogistics = name.toLowerCase() === 'logistics';
 
     var defaultHeaders = isSieving
-      ? ['Date', 'Material', '1-No', '2-No', '3-No', '4-No']
+      ? ['Date', 'TIME', 'Material', '1-No', '2-No', '3-No', '4-No']
       : isLogistics
         ? ['Date', 'Vehicle No', 'Transporter Name', 'Material', 'Movement', 'In-Time', 'Out-Time']
-        : ['Date', 'Material', 'Qty-40', 'Qty-25', 'Qty-20'];
+        : ['Date', 'TIME', 'Material', 'Qty-40', 'Qty-25', 'Qty-20'];
 
     if (sheet.getLastRow() === 0) {
       sheet.appendRow(defaultHeaders);
+    } else if (!isLogistics) {
+      var firstHeader = String(sheet.getRange(1, 1).getValue() || '').trim().toLowerCase();
+      var secondHeader = String(sheet.getRange(1, 2).getValue() || '').trim().toLowerCase().replace(/[\s\-_\.\/]/g, '');
+      if (firstHeader === 'date' && secondHeader !== 'time') {
+        if (secondHeader === 'period' || secondHeader === 'daynight' || secondHeader === 'shift') {
+          sheet.getRange(1, 2).setValue('TIME');
+        } else {
+          sheet.insertColumnAfter(1);
+          sheet.getRange(1, 2).setValue('TIME');
+        }
+      }
     }
 
     var lastCol = Math.max(sheet.getLastColumn(), defaultHeaders.length);
@@ -406,6 +429,7 @@ function doPost(e) {
 
     var valuesMap = {
       date: clean(data.date),
+      daynight: clean(data.dayNight || data.shift),
       material: clean(data.material || data.product),
       qty40: number(data.qty40),
       qty25: number(data.qty25),
@@ -429,6 +453,7 @@ function doPost(e) {
       var val = '';
 
       if (h === 'date') { val = valuesMap.date; hasHeaderMatch = true; }
+      else if (h === 'time' || h === 'period' || h === 'daynight' || h === 'shift') { val = valuesMap.daynight; hasHeaderMatch = true; }
       else if (h === 'material' || h === 'product') { val = valuesMap.material; hasHeaderMatch = true; }
       else if (h === 'qty40' || h === '40') { val = valuesMap.qty40; hasHeaderMatch = true; }
       else if (h === 'qty25' || h === '25') { val = valuesMap.qty25; hasHeaderMatch = true; }
@@ -448,11 +473,11 @@ function doPost(e) {
 
     if (!hasHeaderMatch) {
       if (isSieving) {
-        row = [valuesMap.date, valuesMap.material, valuesMap.qty1no, valuesMap.qty2no, valuesMap.qty3no, valuesMap.qty4no];
+        row = [valuesMap.date, valuesMap.daynight, valuesMap.material, valuesMap.qty1no, valuesMap.qty2no, valuesMap.qty3no, valuesMap.qty4no];
       } else if (isLogistics) {
         row = [valuesMap.date, valuesMap.vehicleno, valuesMap.transporter, valuesMap.material, valuesMap.movement, valuesMap.intime, valuesMap.outtime];
       } else {
-        row = [valuesMap.date, valuesMap.material, valuesMap.qty40, valuesMap.qty25, valuesMap.qty20];
+        row = [valuesMap.date, valuesMap.daynight, valuesMap.material, valuesMap.qty40, valuesMap.qty25, valuesMap.qty20];
       }
     }
 

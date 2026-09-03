@@ -23,6 +23,9 @@
    `MACHINE_SHEETS`, `SHEETS`), materials, and persistence live there — not scattered across
    components. Adding a task or sheet shape means editing this file **and** `APPS_SCRIPT_CODE`
    (kept in sync with [`docs/apps-script.gs`](./apps-script.gs)) together.
+6. **Redeploy Apps Script after sync changes.** Copy the current `APPS_SCRIPT_CODE` or
+  [`docs/apps-script.gs`](./apps-script.gs) into the deployed Google Apps Script project, then
+  create a new deployment version. Updating local code does not update an existing web-app URL.
 
 ---
 

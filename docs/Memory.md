@@ -26,13 +26,13 @@ fans out to each Apps Script endpoint. See [`PRD.md`](./PRD.md) and [`Architectu
 **All core features are implemented and shipped** (Phases 0–7 in [`Phases.md`](./Phases.md)):
 
 - ✅ **Two-task flow:** Step 1 picks the task (Machines / Logistics); the flow adapts.
-- ✅ **Machines:** single-screen entry; 3 sheet types (PUL-32, PUL-25, Sieving) with distinct columns.
+- ✅ **Machines:** single-screen entry; 3 sheet types (PUL-32, PUL-25, Sieving) with distinct columns and a required Day/Night value in the `TIME` column after Date; neither option is selected initially.
 - ✅ **Logistics:** truck / tempo IN–OUT logging — vehicle no + transporter (free-text, "SGL"
   quick-pick) + required movement toggle defaulting to **None** until In/Out is chosen + In/Out
   time pickers + material, on its own `Logistics` tab (`Date, Vehicle No, Transporter Name,
   Material, Movement, In-Time, Out-Time`). Vehicle number and movement are required; both time
   pickers are required.
-- ✅ Predefined + custom materials (shared by both tasks); material selected via quick-select chips
+- ✅ Predefined + custom materials and transporters; both are selected via persisted quick-select chips
   shown in a read-only input; all materials (incl. predefined) can be deleted via a confirmation
   dialog; local recent log (localStorage, capped 100, shows 20, filterable incl. Logistics).
 - ✅ Google Sheets sync via Apps Script through `/api/sheets`; row shape per `sheetName`.

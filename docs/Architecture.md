@@ -136,7 +136,8 @@ Everything that defines *what StockLog is* lives here:
 - **Types:** `TaskType`, `MachineSheet`, `SheetType`, `AppConfig`, `LogEntry`, `AppendRowPayload`, `SyncEndpoint`.
 - **Constants:** `TASKS` (the two tasks), `MACHINE_SHEETS` + `LOGISTICS_SHEET` (column definitions),
   `SHEETS` (all tabs), `PREDEFINED_MATERIALS`, `PREDEFINED_TRANSPORTERS`; `taskForSheet(sheet)` maps a tab to its task.
-- **Persistence:** `loadMaterials/saveMaterials`, `loadConfig/saveConfig`, `loadLog/saveLog`
+- Machine columns are `Date, TIME, Material, ...`; the UI submits `Day` or `Night` as the TIME value, with neither option selected initially. Manager sections use animated Radix collapsibles.
+- **Persistence:** `loadMaterials/saveMaterials`, `loadTransporters/saveTransporters`, `loadConfig/saveConfig`, `loadLog/saveLog`
   (log capped to 100 via `slice(0, 100)`). All guard `typeof window === "undefined"` for SSR.
 - **Config precedence:** `import.meta.env.VITE_*` **beats** stored `localStorage` value, both trimmed.
 - **Sync:** `getConfiguredEndpoints()` builds the endpoint list; `appendRow()` POSTs to `/api/sheets`.
@@ -153,7 +154,7 @@ Everything that defines *what StockLog is* lives here:
 ### `src/routes/index.tsx` — the UI
 Single-screen, controlled-component form. Manages `task` + `machineSheet` (deriving
 `targetSheet`), `materials`, `config`, `log`, the quantity fields per machine sheet, the Logistics
-fields (`vehicleNo`, `transporter`, `movement`, `inTime`, `outTime`), and dialog/loading state. Uses `useInstallPrompt()`;
+fields (`vehicleNo`, `transporter`, `movement`, `inTime`, `outTime`), machine `dayNight`, and dialog/loading state. Uses `useInstallPrompt()`;
 `submit()` validates the active task's fields → builds payload → `appendRow()` → toasts → saves to
 local log. Material selection uses a **read-only input** that reflects the chip selection; all
 materials (including predefined) can be removed via the Materials manager, with a **custom

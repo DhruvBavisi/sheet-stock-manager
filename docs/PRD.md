@@ -103,9 +103,9 @@ A **task** is the top-level choice, defined in [`src/lib/stocklog.ts`](../src/li
 `TaskType = "Machines" | "Logistics"`. Each task maps to one or more Google Sheet tabs:
 
 **Machines** (production) — three sheet types (`MACHINE_SHEETS`):
-- **PUL-32** — columns: `Date, Material, Qty-40, Qty-25, Qty-20`
-- **PUL-25** — columns: `Date, Material, Qty-40, Qty-25, Qty-20`
-- **Sieving** — columns: `Date, Material, 1-No, 2-No, 3-No, 4-No`
+- **PUL-32** — columns: `Date, TIME, Material, Qty-40, Qty-25, Qty-20`
+- **PUL-25** — columns: `Date, TIME, Material, Qty-40, Qty-25, Qty-20`
+- **Sieving** — columns: `Date, TIME, Material, 1-No, 2-No, 3-No, 4-No`
 
 **Logistics** (truck / tempo movement) — one sheet tab:
 - **Logistics** — columns: `Date, Vehicle No, Transporter Name, Material, Movement, In-Time, Out-Time`
@@ -120,9 +120,9 @@ sheet.
 Logistics the material is *what the truck carried*. Material is selected via **quick-select chips**
 and shown in a **read-only input**; any material (including predefined) can be removed from the
 list via a **confirmation dialog**. **Predefined transporters:** `SGL` — a one-tap
-quick-pick on the Logistics form; the transporter field itself is free text.
+quick-pick on the Logistics form; user-added transporter names are also persisted as quick-picks, while the transporter field remains free text.
 
-A **log entry** carries: `id, task, sheetName, date, material`, the relevant quantity fields
+A **log entry** carries: `id, task, sheetName, date, dayNight, material`; the UI stores Day/Night in the `TIME` column for machine rows, plus the relevant quantity fields
 (Machines) **or** `vehicleNo, transporter, movement, inTime, outTime` (Logistics), plus `synced` and
 `syncedCount` (how many of the configured accounts accepted the row).
 

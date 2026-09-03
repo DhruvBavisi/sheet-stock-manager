@@ -132,8 +132,8 @@ soft, friendly, touch-oriented.
 - **Step 2 · machine-sheet selector:** a 3-up control (PUL-32 / PUL-25 / Sieving) shown **only** for
   the Machines task; hidden entirely for Logistics.
 - **Entry card:** header reads "New Entry for `{targetSheet}`". A **read-only Material input** (shows the selected chip) → **material quick-select chips** → **task-specific fields**: quantity inputs per machine sheet, or (Logistics) a vehicle/number-plate
-  input (required) → transporter input with an "SGL" quick-pick chip → a required Movement segmented toggle with the default state left at **None** until the user picks In or Out (green In = arrived, red Out = sent) → In-Time / Out-Time `type="time"` pickers (both required) → date → Append.
-- **Materials manager:** add/remove material chips (shared by both tasks); all materials, including predefined, can be deleted via a custom confirmation dialog (`DeleteMaterialDialog`).
+  input (required) → machine Shift (Day/Night) selector beside Date, with neither option selected initially; Day uses sky blue and Night uses a dark night shade; saved to the `TIME` column → Material input and predefined material chips → task-specific fields, or (Logistics) transporter input with predefined/custom quick-pick chips → a required Movement segmented toggle with the default state left at **None** until the user picks In or Out (green In = arrived, red Out = sent) → In-Time / Out-Time `type="time"` pickers (both required) → Append.
+- **Materials and transporters managers:** collapsed by default, with animated expand/collapse controls and arrow indicators; add/remove persisted chips; all entries, including predefined values, can be deleted via confirmation dialogs.
 - **Recent log:** latest 20 entries as cards. Each card stacks a top row (sheet badge + material +
   date on the left, sync badge + delete on the right) above a full-width detail chip (quantities, or
   vehicle + transporter + movement + In/Out for Logistics). This single-column, stacked layout is

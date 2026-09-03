@@ -46,6 +46,7 @@ async function sendToEndpoint(endpoint: SyncEndpoint, payload: AppendRowPayload)
       entryTime: cleanPayload.inTime ?? "",
       exitTime: cleanPayload.outTime ?? "",
       date: cleanPayload.date,
+      dayNight: cleanPayload.dayNight ?? "",
       material: cleanPayload.material,
       qty40: cleanPayload.qty40 ?? "",
       qty25: cleanPayload.qty25 ?? "",

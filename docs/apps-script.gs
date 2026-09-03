@@ -27,13 +27,24 @@ function doPost(e) {
     var isLogistics = name.toLowerCase() === 'logistics';
 
     var defaultHeaders = isSieving
-      ? ['Date', 'Material', '1-No', '2-No', '3-No', '4-No']
+      ? ['Date', 'TIME', 'Material', '1-No', '2-No', '3-No', '4-No']
       : isLogistics
         ? ['Date', 'Vehicle No', 'Transporter Name', 'Material', 'Movement', 'In-Time', 'Out-Time']
-        : ['Date', 'Material', 'Qty-40', 'Qty-25', 'Qty-20'];
+        : ['Date', 'TIME', 'Material', 'Qty-40', 'Qty-25', 'Qty-20'];
 
     if (sheet.getLastRow() === 0) {
       sheet.appendRow(defaultHeaders);
+    } else if (!isLogistics) {
+      var firstHeader = String(sheet.getRange(1, 1).getValue() || '').trim().toLowerCase();
+      var secondHeader = String(sheet.getRange(1, 2).getValue() || '').trim().toLowerCase().replace(/[\s\-_\.\/]/g, '');
+      if (firstHeader === 'date' && secondHeader !== 'time') {
+        if (secondHeader === 'period' || secondHeader === 'daynight' || secondHeader === 'shift') {
+          sheet.getRange(1, 2).setValue('TIME');
+        } else {
+          sheet.insertColumnAfter(1);
+          sheet.getRange(1, 2).setValue('TIME');
+        }
+      }
     }
 
     var lastCol = Math.max(sheet.getLastColumn(), defaultHeaders.length);
@@ -41,6 +52,7 @@ function doPost(e) {
 
     var valuesMap = {
       date: clean(data.date),
+      daynight: clean(data.dayNight || data.shift),
       material: clean(data.material || data.product),
       qty40: number(data.qty40),
       qty25: number(data.qty25),
@@ -64,6 +76,7 @@ function doPost(e) {
       var val = '';
 
       if (h === 'date') { val = valuesMap.date; hasHeaderMatch = true; }
+      else if (h === 'time' || h === 'period' || h === 'daynight' || h === 'shift') { val = valuesMap.daynight; hasHeaderMatch = true; }
       else if (h === 'material' || h === 'product') { val = valuesMap.material; hasHeaderMatch = true; }
       else if (h === 'qty40' || h === '40') { val = valuesMap.qty40; hasHeaderMatch = true; }
       else if (h === 'qty25' || h === '25') { val = valuesMap.qty25; hasHeaderMatch = true; }
@@ -83,11 +96,11 @@ function doPost(e) {
 
     if (!hasHeaderMatch) {
       if (isSieving) {
-        row = [valuesMap.date, valuesMap.material, valuesMap.qty1no, valuesMap.qty2no, valuesMap.qty3no, valuesMap.qty4no];
+        row = [valuesMap.date, valuesMap.daynight, valuesMap.material, valuesMap.qty1no, valuesMap.qty2no, valuesMap.qty3no, valuesMap.qty4no];
       } else if (isLogistics) {
         row = [valuesMap.date, valuesMap.vehicleno, valuesMap.transporter, valuesMap.material, valuesMap.movement, valuesMap.intime, valuesMap.outtime];
       } else {
-        row = [valuesMap.date, valuesMap.material, valuesMap.qty40, valuesMap.qty25, valuesMap.qty20];
+        row = [valuesMap.date, valuesMap.daynight, valuesMap.material, valuesMap.qty40, valuesMap.qty25, valuesMap.qty20];
       }
     }
 
