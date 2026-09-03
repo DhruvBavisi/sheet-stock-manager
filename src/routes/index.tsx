@@ -530,7 +530,7 @@ function Index() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
-                <Label htmlFor="date" className="text-xs font-semibold text-slate-700">Date</Label>
+                <Label htmlFor="date" className="text-xs font-semibold text-slate-700">Date</Label><span className="text-red-500">*</span>
                 <Input
                   id="date"
                   type="date"
@@ -542,7 +542,7 @@ function Index() {
 
               {task === "Machines" && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-slate-700">Shift <span className="text-red-500">*</span></Label>
+                  <Label className="text-xs font-semibold text-slate-700">Time <span className="text-red-500">*</span></Label>
                   <div className="grid grid-cols-2 gap-2">
                     {(["Day", "Night"] as const).map((shift) => (
                       <button
@@ -577,7 +577,7 @@ function Index() {
                 tabIndex={-1}
                 placeholder="Select from chips below..."
                 onFocus={(e) => e.target.blur()}
-                className="rounded-xl h-11 w-full min-w-0 border-slate-200 bg-slate-50 text-base sm:text-sm font-semibold text-primary cursor-default pointer-events-none select-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-slate-200"
+                className="rounded-xl h-11 lg:w-1/2 md:w-1/2 sm:w-full min-w-0 border-slate-200 bg-slate-50 text-base sm:text-sm font-semibold text-primary cursor-default pointer-events-none select-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-slate-200"
               />
             </div>
 
@@ -844,7 +844,7 @@ function Index() {
           <CollapsibleContent className="collapsible-content space-y-3 pt-3">
             <div className="flex gap-2">
             <Input
-              placeholder="Add custom transporter"
+              placeholder="Add Transporter"
               value={newTransporter}
               onChange={(e) => setNewTransporter(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addTransporter()}
@@ -880,7 +880,7 @@ function Index() {
 
           <div className="flex gap-2">
             <Input
-              placeholder="Add custom material"
+              placeholder="Add Material"
               value={newMaterial}
               onChange={(e) => setNewMaterial(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addMaterial()}
