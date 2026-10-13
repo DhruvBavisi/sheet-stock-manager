@@ -56,6 +56,7 @@ import {
   PREDEFINED_MATERIALS,
   PREDEFINED_TRANSPORTERS,
   appendRow,
+  deleteRow,
   formatDateDDMMMYYYY,
   loadConfig,
   loadLog,
@@ -140,6 +141,8 @@ function Index() {
   const [saving, setSaving] = useState(false);
   const [ready, setReady] = useState(false);
   const [logFilter, setLogFilter] = useState<"ALL" | SheetType>("ALL");
+  const [logDateFilter, setLogDateFilter] = useState("");
+  const [visibleLogCount, setVisibleLogCount] = useState(5);
 
   // Dialog states
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -267,19 +270,25 @@ function Index() {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (isClearAll) {
-      setLog([]);
-      saveLog([]);
-      toast.success("All recent entries cleared");
-    } else if (entryToDelete) {
-      const next = log.filter((item) => item.id !== entryToDelete.id);
+  const confirmDelete = async () => {
+    const entriesToDelete = isClearAll ? log : entryToDelete ? [entryToDelete] : [];
+    const remoteEntries = entriesToDelete.filter((entry) => entry.synced);
+
+    try {
+      if (remoteEntries.length > 0) {
+        await Promise.all(remoteEntries.map((entry) => deleteRow(config, entry)));
+      }
+
+      const deletedIds = new Set(entriesToDelete.map((entry) => entry.id));
+      const next = log.filter((item) => !deletedIds.has(item.id));
       setLog(next);
       saveLog(next);
-      toast.success(`Deleted entry for "${entryToDelete.material}"`);
+      toast.success(isClearAll ? "All recent entries deleted" : `Deleted entry for "${entriesToDelete[0]?.material}"`);
+      setDeleteDialogOpen(false);
+      setEntryToDelete(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not delete the entry from Google Sheets");
     }
-    setDeleteDialogOpen(false);
-    setEntryToDelete(null);
   };
 
   const clearForm = () => {
@@ -348,7 +357,9 @@ function Index() {
           ? { dayNight, qty1No, qty2No, qty3No, qty4No }
           : { dayNight, qty40, qty25, qty20 };
 
+    const entryId = crypto.randomUUID();
     const payload = {
+      entryId,
       sheetName: targetSheet,
       date: formattedDate,
       material,
@@ -356,7 +367,7 @@ function Index() {
     };
 
     const entry: LogEntry = {
-      id: crypto.randomUUID(),
+      id: entryId,
       task,
       sheetName: targetSheet,
       date: formattedDate,
@@ -392,9 +403,17 @@ function Index() {
   };
 
   const filteredLog = useMemo(() => {
-    if (logFilter === "ALL") return log;
-    return log.filter((e) => e.sheetName === logFilter);
-  }, [log, logFilter]);
+    const selectedDate = logDateFilter ? formatDateDDMMMYYYY(logDateFilter) : "";
+    return log.filter((entry) => {
+      const matchesSheet = logFilter === "ALL" || entry.sheetName === logFilter;
+      const matchesDate = !selectedDate || entry.date === selectedDate;
+      return matchesSheet && matchesDate;
+    });
+  }, [log, logDateFilter, logFilter]);
+
+  const visibleLog = filteredLog.slice(0, visibleLogCount);
+  const hasOlderEntries = visibleLog.length < filteredLog.length;
+  const hasExpandedHistory = visibleLogCount > 5;
 
   return (
     <main className="min-h-screen bg-background pb-20">
@@ -928,8 +947,14 @@ function Index() {
               </Badge>
             </div>
 
-            <div className="flex items-center gap-2 justify-between">
-              <Select value={logFilter} onValueChange={(val) => setLogFilter(val as any)}>
+            <div className="flex flex-wrap items-center gap-2 justify-between">
+              <Select
+                value={logFilter}
+                onValueChange={(val) => {
+                  setLogFilter(val as "ALL" | SheetType);
+                  setVisibleLogCount(5);
+                }}
+              >
                 <SelectTrigger className="flex-1 sm:flex-none sm:w-32 h-8 text-xs rounded-lg font-semibold border-slate-200">
                   <SelectValue placeholder="Filter Sheet" />
                 </SelectTrigger>
@@ -941,6 +966,31 @@ function Index() {
                   <SelectItem value="Logistics">Logistics</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Input
+                type="date"
+                value={logDateFilter}
+                onChange={(event) => {
+                  setLogDateFilter(event.target.value);
+                  setVisibleLogCount(5);
+                }}
+                aria-label="Filter history by date"
+                className="h-8 w-34 rounded-lg border-slate-200 px-2 text-xs font-semibold"
+              />
+
+              {logDateFilter && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 px-2 text-xs text-slate-500"
+                  onClick={() => {
+                    setLogDateFilter("");
+                    setVisibleLogCount(5);
+                  }}
+                >
+                  Clear date
+                </Button>
+              )}
 
               {log.length > 0 && (
                 <Button
@@ -961,67 +1011,45 @@ function Index() {
                 No entries found for {logFilter === "ALL" ? "any sheet" : logFilter}.
               </p>
             )}
-            {filteredLog.slice(0, 20).map((e) => (
-              <div
-                key={e.id}
-                className="flex flex-col gap-2.5 p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-blue-50/30 transition-colors text-xs"
-              >
-                <div className="flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Badge variant="outline" className="font-mono text-[11px] font-extrabold border-blue-200 text-primary bg-white shrink-0">
-                      {e.sheetName}
-                    </Badge>
-                    <div className="min-w-0">
-                      <p className="font-bold text-slate-900 truncate text-sm">{e.material}</p>
-                      <p className="text-[11px] text-slate-400">{e.date}{e.dayNight ? ` · ${e.dayNight}` : ""}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <Badge variant={e.synced ? "secondary" : "destructive"} className={`text-[10px] rounded-md shrink-0 font-semibold ${e.synced ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : ""}`}>
-                      {e.synced ? (e.syncedCount && e.syncedCount > 1 ? `${e.syncedCount} Synced` : "Synced") : "Failed"}
-                    </Badge>
-                    <button
-                      onClick={() => openDeleteSingleDialog(e)}
-                      title="Delete entry"
-                      className="rounded-lg p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="text-xs font-mono bg-white border border-blue-100 px-2.5 py-1.5 rounded-lg shadow-2xs">
-                  {e.sheetName === "Logistics" ? (
-                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-slate-800">
-                      {e.vehicleNo && <span className="font-extrabold tracking-wider text-primary">{e.vehicleNo}</span>}
-                      {e.transporter && <span className="text-slate-500 font-semibold">{e.transporter}</span>}
-                      {e.movement && (
-                        <span className={`font-bold ${e.movement === "In" ? "text-emerald-600" : "text-red-500"}`}>
-                          {e.movement}
-                        </span>
-                      )}
-                      {e.inTime && <span>In: <b className="text-emerald-600">{e.inTime}</b></span>}
-                      {e.outTime && <span>Out: <b className="text-red-500">{e.outTime}</b></span>}
-                    </div>
-                  ) : e.sheetName === "Sieving" ? (
-                    <div className="flex flex-wrap gap-x-2.5 gap-y-1 text-slate-800">
-                      {e.qty1No != null && e.qty1No !== "" && <span>1-No: <b className="text-primary">{e.qty1No}</b></span>}
-                      {e.qty2No != null && e.qty2No !== "" && <span>2-No: <b className="text-primary">{e.qty2No}</b></span>}
-                      {e.qty3No != null && e.qty3No !== "" && <span>3-No: <b className="text-primary">{e.qty3No}</b></span>}
-                      {e.qty4No != null && e.qty4No !== "" && <span>4-No: <b className="text-primary">{e.qty4No}</b></span>}
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-x-2.5 gap-y-1 text-slate-800">
-                      {e.dayNight && <span>Shift: <b className="text-primary">{e.dayNight}</b></span>}
-                      {e.qty40 != null && e.qty40 !== "" && <span>Q40: <b className="text-primary">{e.qty40}</b></span>}
-                      {e.qty25 != null && e.qty25 !== "" && <span>Q25: <b className="text-primary">{e.qty25}</b></span>}
-                      {e.qty20 != null && e.qty20 !== "" && <span>Q20: <b className="text-primary">{e.qty20}</b></span>}
-                    </div>
-                  )}
-                </div>
-              </div>
+            {visibleLog.slice(0, 5).map((entry) => (
+              <LogHistoryEntry key={entry.id} entry={entry} onDelete={openDeleteSingleDialog} />
             ))}
+
+            <Collapsible
+              open={hasExpandedHistory}
+              onOpenChange={(open) => {
+                if (!open) setVisibleLogCount(5);
+              }}
+            >
+              <CollapsibleContent className="collapsible-content space-y-2.5">
+                {visibleLog.slice(5).map((entry) => (
+                  <LogHistoryEntry key={entry.id} entry={entry} onDelete={openDeleteSingleDialog} />
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
+
+            {(hasOlderEntries || hasExpandedHistory) && (
+              <div className="flex gap-2">
+                {hasOlderEntries && (
+                  <Button
+                    variant="outline"
+                    className="h-9 flex-1 rounded-lg border-blue-100 text-xs font-semibold text-primary hover:bg-blue-50"
+                    onClick={() => setVisibleLogCount((count) => count + 5)}
+                  >
+                    Show older ({filteredLog.length - visibleLog.length} remaining)
+                  </Button>
+                )}
+                {hasExpandedHistory && (
+                  <Button
+                    variant="ghost"
+                    className="h-9 flex-1 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                    onClick={() => setVisibleLogCount(5)}
+                  >
+                    Show less
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </section>
       </div>
@@ -1049,6 +1077,73 @@ function Index() {
         onConfirmDelete={confirmDeleteTransporter}
       />
     </main>
+  );
+}
+
+function LogHistoryEntry({
+  entry,
+  onDelete,
+}: {
+  entry: LogEntry;
+  onDelete: (entry: LogEntry) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-2.5 text-xs transition-colors hover:bg-blue-50/30 sm:p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Badge variant="outline" className="font-mono text-[11px] font-extrabold border-blue-200 text-primary bg-white shrink-0">
+            {entry.sheetName}
+          </Badge>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-slate-900">{entry.material}</p>
+            <p className="truncate text-[10px] text-slate-400">{entry.date}{entry.dayNight ? ` · ${entry.dayNight}` : ""}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Badge variant={entry.synced ? "secondary" : "destructive"} className={`text-[10px] rounded-md shrink-0 font-semibold ${entry.synced ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : ""}`}>
+            {entry.synced ? (entry.syncedCount && entry.syncedCount > 1 ? `${entry.syncedCount} Synced` : "Synced") : "Failed"}
+          </Badge>
+          <button
+            onClick={() => onDelete(entry)}
+            title="Delete entry"
+            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-1.5 border-t border-slate-200/70 pt-1.5 font-mono text-[11px] leading-tight text-slate-700">
+        {entry.sheetName === "Logistics" ? (
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-slate-800">
+            {entry.vehicleNo && <span className="font-extrabold tracking-wider text-primary">{entry.vehicleNo}</span>}
+            {entry.transporter && <span className="text-slate-500 font-semibold">{entry.transporter}</span>}
+            {entry.movement && (
+              <span className={`font-bold ${entry.movement === "In" ? "text-emerald-600" : "text-red-500"}`}>
+                {entry.movement}
+              </span>
+            )}
+            {entry.inTime && <span>In: <b className="text-emerald-600">{entry.inTime}</b></span>}
+            {entry.outTime && <span>Out: <b className="text-red-500">{entry.outTime}</b></span>}
+          </div>
+        ) : entry.sheetName === "Sieving" ? (
+          <div className="flex flex-wrap gap-x-2.5 gap-y-1 text-slate-800">
+            {entry.qty1No != null && entry.qty1No !== "" && <span>1-No: <b className="text-primary">{entry.qty1No}</b></span>}
+            {entry.qty2No != null && entry.qty2No !== "" && <span>2-No: <b className="text-primary">{entry.qty2No}</b></span>}
+            {entry.qty3No != null && entry.qty3No !== "" && <span>3-No: <b className="text-primary">{entry.qty3No}</b></span>}
+            {entry.qty4No != null && entry.qty4No !== "" && <span>4-No: <b className="text-primary">{entry.qty4No}</b></span>}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-x-2.5 gap-y-1 text-slate-800">
+            {entry.dayNight && <span>Shift: <b className="text-primary">{entry.dayNight}</b></span>}
+            {entry.qty40 != null && entry.qty40 !== "" && <span>Q40: <b className="text-primary">{entry.qty40}</b></span>}
+            {entry.qty25 != null && entry.qty25 !== "" && <span>Q25: <b className="text-primary">{entry.qty25}</b></span>}
+            {entry.qty20 != null && entry.qty20 !== "" && <span>Q20: <b className="text-primary">{entry.qty20}</b></span>}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

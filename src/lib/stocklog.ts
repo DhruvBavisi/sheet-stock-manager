@@ -197,6 +197,7 @@ export function formatDateDDMMMYYYY(dateStr: string): string {
 }
 
 export type AppendRowPayload = {
+  entryId?: string;
   sheetName: SheetType;
   date: string;
   dayNight?: "Day" | "Night" | "";
@@ -236,6 +237,7 @@ function normalizeSheetValue(value: unknown): string {
 
 export function normalizeAppendRowPayload(payload: AppendRowPayload): AppendRowPayload {
   return {
+    entryId: normalizeSheetValue(payload.entryId),
     sheetName: payload.sheetName,
     date: normalizeSheetValue(payload.date),
     dayNight: normalizeSheetValue(payload.dayNight) as "Day" | "Night" | "",
@@ -390,6 +392,61 @@ export async function appendRow(config: AppConfig, payload: AppendRowPayload) {
   };
 }
 
+export async function deleteRow(config: AppConfig, entry: LogEntry) {
+  const endpoints = getConfiguredEndpoints(config);
+
+  if (endpoints.length === 0) {
+    throw new Error("No Google Sheet endpoints configured in .env");
+  }
+
+  const payload = normalizeAppendRowPayload({
+    entryId: entry.id,
+    sheetName: entry.sheetName,
+    date: entry.date,
+    material: entry.material,
+    dayNight: entry.dayNight ?? "",
+    qty40: entry.qty40 ?? "",
+    qty25: entry.qty25 ?? "",
+    qty20: entry.qty20 ?? "",
+    qty1No: entry.qty1No ?? "",
+    qty2No: entry.qty2No ?? "",
+    qty3No: entry.qty3No ?? "",
+    qty4No: entry.qty4No ?? "",
+    vehicleNo: entry.vehicleNo ?? "",
+    transporter: entry.transporter ?? "",
+    movement: entry.movement ?? "",
+    inTime: entry.inTime ?? "",
+    outTime: entry.outTime ?? "",
+  });
+
+  const res = await fetch("/api/sheets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "delete", endpoints, payload }),
+  });
+
+  const text = await res.text();
+  let data: { ok?: boolean; deletedCount?: number; totalEndpoints?: number; errors?: string[]; error?: string } = {};
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    const snippet = text.slice(0, 180).replace(/\s+/g, " ");
+    throw new Error(`Unexpected response from delete API (${res.status}). ${snippet}`);
+  }
+
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || `Delete API failed (${res.status})`);
+  }
+
+  return {
+    ok: true,
+    deletedCount: data.deletedCount ?? endpoints.length,
+    totalEndpoints: data.totalEndpoints ?? endpoints.length,
+    errors: data.errors ?? [],
+  };
+}
+
 export const APPS_SCRIPT_CODE = `function clean(value) {
   if (value === undefined || value === null) return '';
   var text = String(value).trim();
@@ -403,6 +460,60 @@ function number(value) {
   return isNaN(n) ? text : n;
 }
 
+function deleteEntry(data) {
+  var spreadsheet = SpreadsheetApp.openById(clean(data.sheetId));
+  var name = clean(data.sheetName) || 'PUL-32';
+  var sheet = spreadsheet.getSheetByName(name);
+  if (!sheet || sheet.getLastRow() < 2) {
+    return { ok: true, deleted: false };
+  }
+
+  var lastCol = sheet.getLastColumn();
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getValues();
+  var entryId = clean(data.entryId);
+  var entryIdColumn = -1;
+
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i] || '').trim().toLowerCase().replace(/[\s\-_\.\/]/g, '') === 'entryid') {
+      entryIdColumn = i;
+      break;
+    }
+  }
+
+  for (var rowIndex = rows.length - 1; rowIndex >= 0; rowIndex--) {
+    var matches = entryId && entryIdColumn >= 0
+      ? clean(rows[rowIndex][entryIdColumn]) === entryId
+      : matchesEntry(data, headers, rows[rowIndex]);
+    if (matches) {
+      sheet.deleteRow(rowIndex + 2);
+      return { ok: true, deleted: true };
+    }
+  }
+
+  return { ok: true, deleted: false };
+}
+
+function matchesEntry(data, headers, row) {
+  var matched = 0;
+  var required = 0;
+  var values = {
+    date: clean(data.date), time: clean(data.dayNight || data.shift), material: clean(data.material || data.product),
+    qty40: number(data.qty40), qty25: number(data.qty25), qty20: number(data.qty20),
+    qty1no: number(data.qty1No), qty2no: number(data.qty2No), qty3no: number(data.qty3No), qty4no: number(data.qty4No),
+    vehicleno: clean(data.vehicleNo || data.vehicleNumber), transporter: clean(data.transporter || data.transporterName),
+    movement: clean(data.movement || data.movementType), intime: clean(data.inTime || data.entryTime), outtime: clean(data.outTime || data.exitTime)
+  };
+  for (var i = 0; i < headers.length; i++) {
+    var h = String(headers[i] || '').trim().toLowerCase().replace(/[\s\-_\.\/]/g, '');
+    var key = h === 'date' ? 'date' : h === 'time' || h === 'period' || h === 'daynight' || h === 'shift' ? 'time' : h === 'material' || h === 'product' ? 'material' : h === 'qty40' || h === '40' ? 'qty40' : h === 'qty25' || h === '25' ? 'qty25' : h === 'qty20' || h === '20' ? 'qty20' : h === '1no' || h === 'qty1no' ? 'qty1no' : h === '2no' || h === 'qty2no' ? 'qty2no' : h === '3no' || h === 'qty3no' ? 'qty3no' : h === '4no' || h === 'qty4no' ? 'qty4no' : h === 'vehicleno' || h === 'vehiclenumber' || h === 'vehicle' ? 'vehicleno' : h === 'transportername' || h === 'transporter' ? 'transporter' : h === 'movement' || h === 'movementtype' ? 'movement' : h === 'intime' || h === 'entrytime' ? 'intime' : h === 'outtime' || h === 'exittime' ? 'outtime' : '';
+    if (!key || values[key] === '') continue;
+    required++;
+    if (String(row[i] === undefined || row[i] === null ? '' : row[i]).trim() === String(values[key]).trim()) matched++;
+  }
+  return required >= 2 && matched === required;
+}
+
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) {
@@ -411,6 +522,9 @@ function doPost(e) {
     }
 
     var data = JSON.parse(e.postData.contents);
+    if (clean(data.action) === 'delete') {
+      return ContentService.createTextOutput(JSON.stringify(deleteEntry(data))).setMimeType(ContentService.MimeType.JSON);
+    }
     var spreadsheet = SpreadsheetApp.openById(clean(data.sheetId));
     var name = clean(data.sheetName) || 'PUL-32';
     var sheet = spreadsheet.getSheetByName(name) || spreadsheet.insertSheet(name);
@@ -419,10 +533,10 @@ function doPost(e) {
     var isLogistics = name.toLowerCase() === 'logistics';
 
     var defaultHeaders = isSieving
-      ? ['Date', 'TIME', 'Material', '1-No', '2-No', '3-No', '4-No']
+      ? ['Date', 'TIME', 'Material', '1-No', '2-No', '3-No', '4-No', 'Entry ID']
       : isLogistics
-        ? ['Date', 'Vehicle No', 'Transporter Name', 'Material', 'Movement', 'In-Time', 'Out-Time']
-        : ['Date', 'TIME', 'Material', 'Qty-40', 'Qty-25', 'Qty-20'];
+        ? ['Date', 'Vehicle No', 'Transporter Name', 'Material', 'Movement', 'In-Time', 'Out-Time', 'Entry ID']
+        : ['Date', 'TIME', 'Material', 'Qty-40', 'Qty-25', 'Qty-20', 'Entry ID'];
 
     if (sheet.getLastRow() === 0) {
       sheet.appendRow(defaultHeaders);
@@ -439,10 +553,19 @@ function doPost(e) {
       }
     }
 
-    var lastCol = Math.max(sheet.getLastColumn(), defaultHeaders.length);
+    var lastCol = Math.max(sheet.getLastColumn(), defaultHeaders.length - 1);
     var headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var hasEntryIdHeader = headerRow.some(function(header) {
+      return String(header || '').trim().toLowerCase().replace(/[\s\-_\.\/]/g, '') === 'entryid';
+    });
+    if (!hasEntryIdHeader) {
+      lastCol++;
+      sheet.getRange(1, lastCol).setValue('Entry ID');
+      headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    }
 
     var valuesMap = {
+      entryid: clean(data.entryId),
       date: clean(data.date),
       daynight: clean(data.dayNight || data.shift),
       material: clean(data.material || data.product),
@@ -468,6 +591,7 @@ function doPost(e) {
       var val = '';
 
       if (h === 'date') { val = valuesMap.date; hasHeaderMatch = true; }
+      else if (h === 'entryid') { val = valuesMap.entryid; hasHeaderMatch = true; }
       else if (h === 'time' || h === 'period' || h === 'daynight' || h === 'shift') { val = valuesMap.daynight; hasHeaderMatch = true; }
       else if (h === 'material' || h === 'product') { val = valuesMap.material; hasHeaderMatch = true; }
       else if (h === 'qty40' || h === '40') { val = valuesMap.qty40; hasHeaderMatch = true; }
@@ -488,11 +612,11 @@ function doPost(e) {
 
     if (!hasHeaderMatch) {
       if (isSieving) {
-        row = [valuesMap.date, valuesMap.daynight, valuesMap.material, valuesMap.qty1no, valuesMap.qty2no, valuesMap.qty3no, valuesMap.qty4no];
+        row = [valuesMap.date, valuesMap.daynight, valuesMap.material, valuesMap.qty1no, valuesMap.qty2no, valuesMap.qty3no, valuesMap.qty4no, valuesMap.entryid];
       } else if (isLogistics) {
-        row = [valuesMap.date, valuesMap.vehicleno, valuesMap.transporter, valuesMap.material, valuesMap.movement, valuesMap.intime, valuesMap.outtime];
+        row = [valuesMap.date, valuesMap.vehicleno, valuesMap.transporter, valuesMap.material, valuesMap.movement, valuesMap.intime, valuesMap.outtime, valuesMap.entryid];
       } else {
-        row = [valuesMap.date, valuesMap.daynight, valuesMap.material, valuesMap.qty40, valuesMap.qty25, valuesMap.qty20];
+        row = [valuesMap.date, valuesMap.daynight, valuesMap.material, valuesMap.qty40, valuesMap.qty25, valuesMap.qty20, valuesMap.entryid];
       }
     }
 

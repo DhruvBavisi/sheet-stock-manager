@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { normalizeAppendRowPayload, type AppendRowPayload, type SyncEndpoint } from "@/lib/stocklog";
 
 type SyncRequestBody = {
+  action?: "append" | "delete";
   endpoints?: SyncEndpoint[];
   payload?: AppendRowPayload;
 };
@@ -24,7 +25,7 @@ async function retry<T>(task: () => Promise<T>, attempts = 2) {
   throw lastError;
 }
 
-async function sendToEndpoint(endpoint: SyncEndpoint, payload: AppendRowPayload) {
+async function sendToEndpoint(endpoint: SyncEndpoint, payload: AppendRowPayload, action: "append" | "delete") {
   const cleanPayload = normalizeAppendRowPayload(payload);
   const legacyQuantity = cleanPayload.sheetName === "Sieving"
     ? cleanPayload.qty1No ?? ""
@@ -35,7 +36,9 @@ async function sendToEndpoint(endpoint: SyncEndpoint, payload: AppendRowPayload)
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({
+      action,
       sheetId: endpoint.sheetId.trim(),
+      entryId: cleanPayload.entryId ?? "",
       sheetName: cleanPayload.sheetName,
       product: cleanPayload.material,
       quantity: legacyQuantity,
@@ -88,6 +91,7 @@ export const Route = createFileRoute("/api/sheets")({
     handlers: {
       POST: async ({ request }) => {
         const body = (await request.json()) as SyncRequestBody;
+        const action = body.action ?? "append";
         const endpoints = body.endpoints ?? [];
         const payload = body.payload ? normalizeAppendRowPayload(body.payload) : undefined;
 
@@ -100,7 +104,7 @@ export const Route = createFileRoute("/api/sheets")({
         }
 
         const results = await Promise.allSettled(
-          endpoints.map((endpoint) => retry(() => sendToEndpoint(endpoint, payload))),
+          endpoints.map((endpoint) => retry(() => sendToEndpoint(endpoint, payload, action))),
         );
 
         let successCount = 0;
@@ -122,8 +126,9 @@ export const Route = createFileRoute("/api/sheets")({
               error:
                 successCount === 0
                   ? `Failed to sync to any Google Sheet. ${errors.join("; ")}`
-                  : `Partial sync only: appended to ${successCount} of ${endpoints.length} Google Sheets. ${errors.join("; ")}`,
+                    : `Partial ${action} only: completed on ${successCount} of ${endpoints.length} Google Sheets. ${errors.join("; ")}`,
               syncedCount: successCount,
+                  deletedCount: action === "delete" ? successCount : undefined,
               totalEndpoints: endpoints.length,
               errors,
             },
@@ -134,6 +139,7 @@ export const Route = createFileRoute("/api/sheets")({
         return Response.json({
           ok: true,
           syncedCount: successCount,
+          deletedCount: action === "delete" ? successCount : undefined,
           totalEndpoints: endpoints.length,
           errors,
         });

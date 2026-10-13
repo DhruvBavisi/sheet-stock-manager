@@ -58,7 +58,7 @@ export function DeleteEntryDialog({
                 {isClearAll ? "Clear All Recent Entries?" : "Delete Entry Confirmation"}
               </AlertDialogTitle>
               <p className="text-xs text-muted-foreground">
-                This action is permanent for your local log history.
+                This removes the entry from your local history and configured Google Sheets.
               </p>
             </div>
           </div>
@@ -91,7 +91,7 @@ export function DeleteEntryDialog({
                   <div className="flex justify-between">
                     <span className="text-muted-foreground font-sans">Status:</span>
                     <span className={entry.synced ? "text-emerald-500" : "text-amber-500"}>
-                      {entry.synced ? "Synced to Google Sheet" : "Local Log"}
+                      {entry.synced ? "Synced to Google Sheets" : "Local Log only"}
                     </span>
                   </div>
                 </div>
