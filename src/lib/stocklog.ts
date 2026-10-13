@@ -78,6 +78,9 @@ export type AppConfig = {
   // Account 2 / Email 2 (Optional)
   scriptUrl2?: string;
   sheetId2?: string;
+  // Account 3 / Email 3 (Optional)
+  scriptUrl3?: string;
+  sheetId3?: string;
   sheetName: string;
 };
 
@@ -142,6 +145,8 @@ export const loadConfig = (): AppConfig => {
   const envSheetId = (import.meta.env["GOOGLE_SHEET_ID"] ?? "") as string;
   const envUrl2 = (import.meta.env["APPS_SCRIPT_URL_2"] ?? "") as string;
   const envSheetId2 = (import.meta.env["GOOGLE_SHEET_ID_2"] ?? "") as string;
+  const envUrl3 = (import.meta.env["APPS_SCRIPT_URL_3"] ?? "") as string;
+  const envSheetId3 = (import.meta.env["GOOGLE_SHEET_ID_3"] ?? "") as string;
   const envSheetName = (import.meta.env["GOOGLE_SHEET_NAME"] ?? "PUL-32") as string;
 
   const stored = read<AppConfig>(CONFIG_KEY, {
@@ -149,6 +154,8 @@ export const loadConfig = (): AppConfig => {
     sheetId: "",
     scriptUrl2: "",
     sheetId2: "",
+    scriptUrl3: "",
+    sheetId3: "",
     sheetName: "PUL-32",
   });
 
@@ -157,6 +164,8 @@ export const loadConfig = (): AppConfig => {
     sheetId: (envSheetId || stored?.sheetId || "").trim(),
     scriptUrl2: (envUrl2 || stored?.scriptUrl2 || "").trim(),
     sheetId2: (envSheetId2 || stored?.sheetId2 || "").trim(),
+    scriptUrl3: (envUrl3 || stored?.scriptUrl3 || "").trim(),
+    sheetId3: (envSheetId3 || stored?.sheetId3 || "").trim(),
     sheetName: (envSheetName || stored?.sheetName || "PUL-32").trim(),
   };
 };
@@ -265,6 +274,12 @@ export function getConfiguredEndpoints(config: AppConfig): SyncEndpoint[] {
   const id2 = config?.sheetId2?.trim();
   if (url2 && id2) {
     endpoints.push({ name: "Account 2", url: url2, sheetId: id2 });
+  }
+
+  const url3 = config?.scriptUrl3?.trim();
+  const id3 = config?.sheetId3?.trim();
+  if (url3 && id3) {
+    endpoints.push({ name: "Account 3", url: url3, sheetId: id3 });
   }
 
   return endpoints;

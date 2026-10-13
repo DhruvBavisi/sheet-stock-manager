@@ -107,6 +107,8 @@ function Index() {
     sheetId: "",
     scriptUrl2: "",
     sheetId2: "",
+    scriptUrl3: "",
+    sheetId3: "",
     sheetName: "PUL-32",
   });
   const [log, setLog] = useState<LogEntry[]>([]);
@@ -185,6 +187,7 @@ function Index() {
     let count = 0;
     if (config?.scriptUrl?.trim() && config?.sheetId?.trim()) count++;
     if (config?.scriptUrl2?.trim() && config?.sheetId2?.trim()) count++;
+    if (config?.scriptUrl3?.trim() && config?.sheetId3?.trim()) count++;
     return count;
   }, [config]);
 
@@ -370,7 +373,7 @@ function Index() {
       entry.syncedCount = res.syncedCount;
 
       if (res.syncedCount > 1) {
-        toast.success(`Logged ${subject} to ${targetSheet} in 2 Google Sheets (Email 1 & Email 2)!`);
+        toast.success(`Logged ${subject} to ${targetSheet} in ${res.syncedCount} Google Sheets!`);
       } else {
         toast.success(`Logged ${subject} to ${targetSheet} in Google Sheet (${formattedDate})`);
       }
@@ -976,7 +979,7 @@ function Index() {
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     <Badge variant={e.synced ? "secondary" : "destructive"} className={`text-[10px] rounded-md shrink-0 font-semibold ${e.synced ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : ""}`}>
-                      {e.synced ? (e.syncedCount && e.syncedCount > 1 ? "Dual" : "Synced") : "Failed"}
+                      {e.synced ? (e.syncedCount && e.syncedCount > 1 ? `${e.syncedCount} Synced` : "Synced") : "Failed"}
                     </Badge>
                     <button
                       onClick={() => openDeleteSingleDialog(e)}
@@ -1069,10 +1072,10 @@ function SettingsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-slate-900 font-bold">
             <ShieldCheck className="size-5 text-primary" />
-            Google Sheets Dual Email Connection
+            Google Sheets Multi-Account Connection
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-500">
-            Link 2 separate Google Accounts / Emails to save data to both Google Sheets simultaneously.
+            Link up to 3 separate Google Accounts / Emails to save data to all configured Google Sheets simultaneously.
           </DialogDescription>
         </DialogHeader>
 
@@ -1080,9 +1083,10 @@ function SettingsDialog({
           <Separator />
 
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-primary font-medium space-y-1">
-            <p><b>Dual Email Instructions:</b></p>
+            <p><b>Multi-Account Instructions:</b></p>
             <p>1. Deploy the Apps Script in <b>Google Account 1</b> & paste its URL/Sheet ID as <code>APPS_SCRIPT_URL</code> & <code>GOOGLE_SHEET_ID</code>.</p>
             <p>2. Deploy the Apps Script in <b>Google Account 2</b> & paste its URL/Sheet ID as <code>APPS_SCRIPT_URL_2</code> & <code>GOOGLE_SHEET_ID_2</code>.</p>
+            <p>3. Deploy the Apps Script in <b>Google Account 3</b> & paste its URL/Sheet ID as <code>APPS_SCRIPT_URL_3</code> & <code>GOOGLE_SHEET_ID_3</code>.</p>
           </div>
 
           <div className="space-y-2">
